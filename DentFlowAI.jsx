@@ -1085,7 +1085,9 @@ export default function DentFlowAI() {
         </header>
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-5 md:p-7">
-          {renderSection()}
+          <div className="w-full min-h-[980px] lg:min-h-[1180px]">
+            {renderSection()}
+          </div>
         </div>
       </main>
     </div>
