@@ -126,7 +126,7 @@ function Dashboard({ kpi, setSection }) {
             <p className="text-sm text-teal-50 mt-2 max-w-2xl">Il sistema lavora sul portafoglio pazienti esistente dello studio: recupera cancellazioni, richiama pazienti inattivi e segue i preventivi prima che diventino fatturato perso.</p>
           </div>
           <button onClick={()=>setSection("fillgap")} className="bg-white text-teal-700 hover:bg-teal-50 font-semibold px-4 py-2.5 rounded-lg text-sm transition-colors">
-            Trasforma una cancellazione in opportunità
+            Trasforma in un'opportunità
           </button>
         </div>
       </Card>
