@@ -1032,7 +1032,7 @@ export default function DentFlowAI() {
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden" style={{fontFamily:"'DM Sans', system-ui, sans-serif"}}>
+    <div className="flex h-screen w-screen bg-slate-50 font-sans overflow-hidden" style={{fontFamily:"'DM Sans', system-ui, sans-serif"}}>
       {/* Sidebar */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-60 bg-white border-r border-slate-100 flex flex-col transform transition-transform md:relative md:translate-x-0 ${menuOpen?"translate-x-0":"-translate-x-full"}`}>
         <div className="px-5 py-5 border-b border-slate-100">

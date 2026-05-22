@@ -40,6 +40,10 @@
           .replace('import { useState, useEffect } from "react";', "const { useState, useEffect } = React;")
           .replace("export default function DentFlowAI", "function DentFlowAI");
 
+        const root = document.getElementById("root");
+        root.className = "";
+        root.textContent = "";
+
         const compiled = Babel.transform(
           `${source}\nReactDOM.createRoot(document.getElementById("root")).render(React.createElement(DentFlowAI));`,
           { presets: ["react"] }
