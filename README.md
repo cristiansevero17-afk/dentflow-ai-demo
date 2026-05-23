@@ -18,6 +18,29 @@ http://localhost:5173
 
 La demo usa dati mock e simula tutte le automazioni lato front-end.
 
+## WhatsApp reale per colloquio
+
+Per mostrare una rinuncia ricevuta davvero da WhatsApp, usa il server locale:
+
+```powershell
+npm.cmd install
+npm.cmd run whatsapp-demo
+```
+
+Poi apri:
+
+```text
+http://localhost:8787
+```
+
+Nella sezione WhatsApp Web clicca `Collega WhatsApp reale`, scansiona il QR dal telefono e fai arrivare un messaggio simile a:
+
+```text
+Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace.
+```
+
+La webapp riconosce la rinuncia, aggiorna lo slot dell'agenda e apre il flusso Fill the Gap. Questa modalita e pensata solo per demo locale; per produzione va usato un canale WhatsApp Business autorizzato.
+
 ## Deploy
 
 Il progetto è pronto per hosting statico.

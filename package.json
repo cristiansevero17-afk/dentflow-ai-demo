@@ -1,0 +1,16 @@
+{
+  "name": "demo-studio-dentistico",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Demo operativa per studio dentistico con agenda, Fill the Gap e collegamento WhatsApp demo locale.",
+  "scripts": {
+    "whatsapp-demo": "node server/whatsapp-demo-server.js",
+    "serve": "node server/whatsapp-demo-server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "qrcode": "^1.5.4",
+    "whatsapp-web.js": "^1.26.0"
+  }
+}

@@ -12,6 +12,8 @@ const sections = [
   { id: "whatsapp", label: "WhatsApp Web", mark: "WA" },
 ];
 
+const whatsappLocalServerUrl = "http://localhost:8787";
+
 const initialSlots = [
   { time: "09:00", patient: "Roberto Galli", treatment: "Controllo ortodonzia", status: "completato", channel: "Email" },
   { time: "10:00", patient: "Giulia Ferri", treatment: "Igiene dentale", status: "completato", channel: "WhatsApp" },
@@ -421,11 +423,18 @@ function DemoStudioDentisticoApp() {
   const [conversations, setConversations] = useState(initialConversations);
   const [selectedConversation, setSelectedConversation] = useState(initialConversations[0]);
   const [whatsappStatus, setWhatsappStatus] = useState("not_connected");
+  const [realWhatsapp, setRealWhatsapp] = useState({
+    available: false,
+    status: "offline",
+    qr: null,
+    error: null,
+  });
   const [whatsappEvents, setWhatsappEvents] = useState([
     "Sistema pronto per ricevere messaggi operativi dai pazienti collegati alla demo.",
   ]);
 
   const activeLabel = sections.find((section) => section.id === activeSection)?.label || "Agenda";
+  const whatsappHeaderConnected = whatsappStatus === "connected" || realWhatsapp.status === "connected";
   const targetSlot = slots.find((slot) => slot.time === "16:00");
   const selectedMonthDay = monthDays.find((day) => day.key === selectedAgendaDay) || monthDays.find((day) => day.key === demoAgendaDate);
   const selectedDaySlots =
@@ -442,6 +451,60 @@ function DemoStudioDentisticoApp() {
     const current = conversations.find((conversation) => conversation.id === selectedConversation?.id);
     if (current) setSelectedConversation(current);
   }, [conversations]);
+
+  useEffect(() => {
+    let source;
+    let closed = false;
+
+    async function connectToLocalBridge() {
+      try {
+        const response = await fetch(`${whatsappLocalServerUrl}/api/whatsapp/status`, { cache: "no-store" });
+        if (!response.ok) throw new Error("Server locale non disponibile");
+        const data = await response.json();
+        if (closed) return;
+
+        setRealWhatsapp({
+          available: true,
+          status: data.status || "idle",
+          qr: data.qr || null,
+          error: data.error || null,
+        });
+
+        source = new EventSource(`${whatsappLocalServerUrl}/api/whatsapp/events`);
+        source.addEventListener("status", (event) => {
+          const payload = JSON.parse(event.data);
+          setRealWhatsapp({
+            available: true,
+            status: payload.status || "idle",
+            qr: payload.qr || null,
+            error: payload.error || null,
+          });
+        });
+        source.addEventListener("log", (event) => {
+          const payload = JSON.parse(event.data);
+          if (payload.message) setWhatsappEvents((events) => [payload.message, ...events]);
+        });
+        source.addEventListener("cancellation", (event) => {
+          handleRealWhatsAppCancellation(JSON.parse(event.data));
+        });
+      } catch (error) {
+        if (!closed) {
+          setRealWhatsapp({
+            available: false,
+            status: "offline",
+            qr: null,
+            error: "Server WhatsApp locale non avviato",
+          });
+        }
+      }
+    }
+
+    connectToLocalBridge();
+    return () => {
+      closed = true;
+      if (source) source.close();
+    };
+  }, []);
 
   function markSlotAsOpen(source = "manual") {
     setSlots((current) =>
@@ -577,6 +640,63 @@ function DemoStudioDentisticoApp() {
     });
   }
 
+  async function connectRealWhatsApp() {
+    try {
+      setRealWhatsapp((current) => ({ ...current, available: true, status: "starting", error: null }));
+      const response = await fetch(`${whatsappLocalServerUrl}/api/whatsapp/connect`, { method: "POST" });
+      if (!response.ok) throw new Error("Server locale non disponibile");
+      const data = await response.json();
+      setRealWhatsapp({
+        available: true,
+        status: data.status || "starting",
+        qr: data.qr || null,
+        error: data.error || null,
+      });
+      setWhatsappEvents((events) => ["Collegamento reale avviato. Se compare il QR, scansionalo da WhatsApp sul telefono.", ...events]);
+    } catch (error) {
+      setRealWhatsapp({
+        available: false,
+        status: "offline",
+        qr: null,
+        error: "Avvia prima il server locale con npm.cmd run whatsapp-demo",
+      });
+      setWhatsappEvents((events) => ["Server WhatsApp locale non raggiungibile. Avvia npm.cmd run whatsapp-demo e ricarica la demo.", ...events]);
+    }
+  }
+
+  async function disconnectRealWhatsApp() {
+    try {
+      await fetch(`${whatsappLocalServerUrl}/api/whatsapp/disconnect`, { method: "POST" });
+    } catch (error) {
+      setWhatsappEvents((events) => ["Non riesco a disconnettere il server locale. Puoi chiudere il terminale del server.", ...events]);
+    }
+  }
+
+  function handleRealWhatsAppCancellation(payload) {
+    const contactName = payload.contactName || "Paziente WhatsApp";
+    const messageText = payload.body || "Messaggio di rinuncia ricevuto via WhatsApp.";
+
+    setSelectedAgendaDay(demoAgendaDate);
+    markSlotAsOpen("real");
+    setWhatsappEvents((events) => [
+      `Messaggio reale ricevuto da ${contactName}: ${messageText}`,
+      "Il sistema ha riconosciuto una rinuncia e ha preparato lo scenario Fill the Gap.",
+      ...events,
+    ]);
+    addOrUpdateConversation({
+      id: "whatsapp-reale-rinuncia",
+      name: contactName,
+      channel: "WhatsApp reale",
+      status: "Rinuncia ricevuta",
+      preview: messageText,
+      messages: [
+        { from: contactName, text: messageText },
+        { from: "Studio", text: "Grazie per averci avvisato. Ti proponiamo nuove disponibilita appena possibile." },
+      ],
+    });
+    setActiveSection("fillgap");
+  }
+
   function resetScenario() {
     setSlots(initialSlots);
     setSelectedAgendaDay(demoAgendaDate);
@@ -639,7 +759,7 @@ function DemoStudioDentisticoApp() {
             <div className="mt-1 text-xs text-slate-500">Console demo · simulazione studio dentistico</div>
           </div>
           <div className="flex items-center gap-3">
-            <Badge tone={whatsappStatus === "connected" ? "teal" : "slate"}>{whatsappStatus === "connected" ? "WhatsApp demo collegato" : "WhatsApp demo non collegato"}</Badge>
+            <Badge tone={whatsappHeaderConnected ? "teal" : "slate"}>{whatsappHeaderConnected ? "WhatsApp collegato" : "WhatsApp non collegato"}</Badge>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white">A</div>
           </div>
         </header>
@@ -697,8 +817,11 @@ function DemoStudioDentisticoApp() {
           {activeSection === "whatsapp" && (
             <WhatsAppSection
               status={whatsappStatus}
+              realWhatsapp={realWhatsapp}
               events={whatsappEvents}
               connect={connectWhatsAppDemo}
+              connectReal={connectRealWhatsApp}
+              disconnectReal={disconnectRealWhatsApp}
               triggerCancellation={triggerWhatsappCancellation}
               setActiveSection={setActiveSection}
             />
@@ -1368,43 +1491,84 @@ function MessagesSection({ conversations, selected, setSelected, setActiveSectio
   );
 }
 
-function WhatsAppSection({ status, events, connect, triggerCancellation, setActiveSection }) {
+function WhatsAppSection({ status, realWhatsapp, events, connect, connectReal, disconnectReal, triggerCancellation, setActiveSection }) {
+  const realStatusLabel = {
+    offline: "Server locale spento",
+    idle: "Pronto",
+    starting: "Avvio in corso",
+    qr: "QR da scansionare",
+    connected: "Collegato",
+    disconnected: "Disconnesso",
+    error: "Errore",
+  }[realWhatsapp.status] || realWhatsapp.status;
+
   return (
     <PageFrame title="WhatsApp Web" subtitle="Collegamento demo per mostrare al titolare cosa succede quando un paziente rinuncia via WhatsApp e il sistema prepara automaticamente il Fill the Gap.">
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[430px_1fr]">
         <Panel className="p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="font-bold text-slate-950">Stato collegamento</h2>
+              <h2 className="font-bold text-slate-950">WhatsApp reale demo locale</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Questa e una simulazione front-end: in produzione il collegamento richiede autorizzazioni, consenso e canali approvati.
+                Per il colloquio puoi collegare il tuo WhatsApp con QR reale. Funziona solo se il server locale e acceso sul tuo PC.
               </p>
             </div>
-            <Badge tone={status === "connected" ? "teal" : status === "pairing" ? "amber" : "slate"}>
-              {status === "connected" ? "Collegato" : status === "pairing" ? "In collegamento" : "Non collegato"}
+            <Badge tone={realWhatsapp.status === "connected" ? "teal" : realWhatsapp.status === "qr" || realWhatsapp.status === "starting" ? "amber" : "slate"}>
+              {realStatusLabel}
             </Badge>
           </div>
 
           <div className="mt-6 flex justify-center">
-            <QrDemo active={status !== "not_connected"} />
+            {realWhatsapp.qr ? (
+              <img src={realWhatsapp.qr} alt="QR WhatsApp reale demo" className="h-64 w-64 rounded-lg border border-slate-200 bg-white p-3 shadow-sm" />
+            ) : (
+              <QrDemo active={realWhatsapp.status === "connected" || status !== "not_connected"} />
+            )}
           </div>
 
           <div className="mt-6 space-y-3">
-            <Button onClick={connect} disabled={status === "connected" || status === "pairing"} className="w-full">
-              {status === "connected" ? "WhatsApp demo collegato" : status === "pairing" ? "Collegamento in corso" : "Collega WhatsApp Web demo"}
+            <Button onClick={connectReal} disabled={realWhatsapp.status === "connected" || realWhatsapp.status === "starting"} className="w-full">
+              {realWhatsapp.status === "connected" ? "WhatsApp reale collegato" : realWhatsapp.status === "starting" ? "Avvio collegamento reale" : "Collega WhatsApp reale"}
             </Button>
-            <Button onClick={triggerCancellation} disabled={status !== "connected"} variant="secondary" className="w-full">
-              Simula rinuncia ricevuta su WhatsApp
+            <Button onClick={disconnectReal} disabled={!realWhatsapp.available || realWhatsapp.status === "offline"} variant="secondary" className="w-full">
+              Disconnetti collegamento reale
             </Button>
+          </div>
+
+          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-600">
+            Avvio locale: <span className="font-semibold text-slate-800">npm.cmd run whatsapp-demo</span>. Poi apri <span className="font-semibold text-slate-800">http://localhost:8787</span>.
+            {realWhatsapp.error && <div className="mt-2 text-rose-700">{realWhatsapp.error}</div>}
           </div>
         </Panel>
 
         <div className="space-y-6">
           <Panel className="p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-bold text-slate-950">Simulazione senza server</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Resta disponibile come piano B se durante il colloquio non vuoi collegare un account WhatsApp reale.
+                </p>
+              </div>
+              <Badge tone={status === "connected" ? "teal" : status === "pairing" ? "amber" : "slate"}>
+                {status === "connected" ? "Collegata" : status === "pairing" ? "In collegamento" : "Non collegata"}
+              </Badge>
+            </div>
+            <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Button onClick={connect} disabled={status === "connected" || status === "pairing"} variant="secondary">
+                {status === "connected" ? "Simulazione collegata" : status === "pairing" ? "Collegamento in corso" : "Avvia simulazione"}
+              </Button>
+              <Button onClick={triggerCancellation} disabled={status !== "connected"} variant="secondary">
+                Simula rinuncia su WhatsApp
+              </Button>
+            </div>
+          </Panel>
+
+          <Panel className="p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-bold text-slate-950">Eventi in tempo reale</h2>
-                <p className="mt-1 text-sm text-slate-500">La demo mostra l'arrivo del messaggio e l'apertura dello scenario Fill the Gap.</p>
+                <p className="mt-1 text-sm text-slate-500">Quando arriva una rinuncia vera o simulata, il sistema apre lo scenario Fill the Gap.</p>
               </div>
               <Button variant="secondary" onClick={() => setActiveSection("fillgap")}>Apri Fill the Gap</Button>
             </div>
@@ -1416,12 +1580,12 @@ function WhatsAppSection({ status, events, connect, triggerCancellation, setActi
           </Panel>
 
           <Panel className="p-6">
-            <h2 className="font-bold text-slate-950">Messaggio di rinuncia demo</h2>
+            <h2 className="font-bold text-slate-950">Frase trigger per il colloquio</h2>
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
               Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace.
             </div>
             <p className="mt-4 text-sm leading-6 text-slate-600">
-              Dopo il messaggio, il sistema cambia lo slot in "da riempire", prepara i pazienti compatibili e lascia allo staff il controllo dell'invio.
+              Invia una frase simile al WhatsApp collegato: il server locale riconosce la rinuncia, passa l'evento alla webapp e prepara il Fill the Gap.
             </p>
           </Panel>
         </div>
