@@ -1,6 +1,6 @@
-# DentFlow AI demo
+# Demo Studio Dentistico
 
-Demo front-end per Studio Dentistico Aurora, focalizzata su recupero slot vuoti, follow-up pazienti, preventivi e ROI.
+Demo front-end operativa per uno studio dentistico, focalizzata su simulazione agenda, Fill the Gap, follow-up pazienti, preventivi e messaggi.
 
 ## Avvio locale
 
@@ -42,7 +42,7 @@ Usa deploy hook URL, non password account.
 
 ### Render
 
-Render Dashboard > servizio `dentflow-ai-demo` > Settings > Deploy Hook.
+Render Dashboard > servizio `demo-studio-dentistico` > Settings > Deploy Hook.
 
 ### Vercel
 

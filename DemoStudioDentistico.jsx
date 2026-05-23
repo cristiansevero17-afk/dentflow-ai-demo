@@ -191,7 +191,7 @@ const initialConversations = [
     status: "Risposto",
     preview: "Si, confermo per domani alle 16:00.",
     messages: [
-      { from: "Studio", text: "Ciao Maria, si e appena liberato uno slot domani alle 16:00 per igiene dentale presso Studio Dentistico Aurora. Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te." },
+      { from: "Studio", text: "Ciao Maria, si e appena liberato uno slot domani alle 16:00 per igiene dentale presso Demo Studio Dentistico. Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te." },
       { from: "Maria", text: "Si, confermo per domani alle 16:00." },
     ],
   },
@@ -298,7 +298,7 @@ function EmptyLine({ children }) {
   return <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">{children}</div>;
 }
 
-function DentFlowApp() {
+function DemoStudioDentisticoApp() {
   const [activeSection, setActiveSection] = useState("agenda");
   const [slots, setSlots] = useState(initialSlots);
   const [gapStatus, setGapStatus] = useState("idle");
@@ -348,7 +348,7 @@ function DentFlowApp() {
     if (source === "whatsapp") {
       setWhatsappEvents((events) => [
         "Messaggio ricevuto da Giulia Ferri: devo rinunciare all'appuntamento di domani alle 16:00.",
-        "DentFlow ha rilevato uno slot da riempire e ha preparato la lista dei pazienti compatibili.",
+        "Demo Studio Dentistico ha rilevato uno slot da riempire e ha preparato la lista dei pazienti compatibili.",
         ...events,
       ]);
     }
@@ -411,7 +411,7 @@ function DentFlowApp() {
         status: "Risposto",
         preview: "Si, confermo per domani alle 16:00.",
         messages: [
-          { from: "Studio", text: "Ciao Maria, si e appena liberato uno slot domani alle 16:00 per igiene dentale presso Studio Dentistico Aurora. Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te." },
+          { from: "Studio", text: "Ciao Maria, si e appena liberato uno slot domani alle 16:00 per igiene dentale presso Demo Studio Dentistico. Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te." },
           { from: "Maria", text: "Si, confermo per domani alle 16:00." },
           { from: "Studio", text: "Perfetto, appuntamento confermato. A domani." },
         ],
@@ -486,8 +486,8 @@ function DentFlowApp() {
         <div className="flex h-24 flex-shrink-0 items-center gap-3 border-b border-slate-100 px-6">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-700 text-sm font-bold text-white">D</div>
           <div>
-            <div className="font-bold text-slate-950">DentFlow AI</div>
-            <div className="text-xs text-slate-500">Studio Aurora · Milano</div>
+            <div className="font-bold text-slate-950">Demo Studio Dentistico</div>
+            <div className="text-xs text-slate-500">Studio demo · Milano</div>
           </div>
         </div>
 
@@ -598,7 +598,7 @@ function AgendaSection({ slots, targetSlot, simulateCancellation, resetScenario,
         <Panel className="overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
             <div>
-              <h2 className="font-bold text-slate-950">Domani · Studio Dentistico Aurora</h2>
+              <h2 className="font-bold text-slate-950">Domani · Demo Studio Dentistico</h2>
               <p className="mt-1 text-sm text-slate-500">Orario studio: lunedi-venerdi 9:00-19:00</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -627,7 +627,7 @@ function AgendaSection({ slots, targetSlot, simulateCancellation, resetScenario,
           <Panel className="p-6">
             <h3 className="font-bold text-slate-950">Scenario demo</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">
-              Lo slot delle 16:00 e il punto centrale della simulazione. Quando il paziente rinuncia, DentFlow prepara il Fill the Gap e suggerisce chi contattare.
+              Lo slot delle 16:00 e il punto centrale della simulazione. Quando il paziente rinuncia, il sistema prepara il Fill the Gap e suggerisce chi contattare.
             </p>
             <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Slot monitorato</div>
@@ -722,7 +722,7 @@ function FillGapSection({ status, log, slot, simulateCancellation, runCampaign, 
           <Panel className="p-6">
             <h3 className="font-bold text-slate-950">Anteprima messaggio</h3>
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-              Ciao Maria, si e appena liberato uno slot domani alle 16:00 per igiene dentale presso Studio Dentistico Aurora.
+              Ciao Maria, si e appena liberato uno slot domani alle 16:00 per igiene dentale presso Demo Studio Dentistico.
               Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te.
             </div>
             <p className="mt-3 text-xs leading-5 text-slate-500">
@@ -1173,7 +1173,7 @@ function WhatsAppSection({ status, events, connect, triggerCancellation, setActi
               Buongiorno, devo rinunciare all'appuntamento di domani alle 16:00. Mi dispiace.
             </div>
             <p className="mt-4 text-sm leading-6 text-slate-600">
-              Dopo il messaggio, DentFlow cambia lo slot in "da riempire", prepara i pazienti compatibili e lascia allo staff il controllo dell'invio.
+              Dopo il messaggio, il sistema cambia lo slot in "da riempire", prepara i pazienti compatibili e lascia allo staff il controllo dell'invio.
             </p>
           </Panel>
         </div>
@@ -1190,6 +1190,6 @@ function QrDemo({ active }) {
   return <div className="grid grid-cols-7 gap-1 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">{cells}</div>;
 }
 
-export default function DentFlowAI() {
-  return <DentFlowApp />;
+export default function DemoStudioDentistico() {
+  return <DemoStudioDentisticoApp />;
 }

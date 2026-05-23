@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>DentFlow AI - Demo Studio Dentistico Aurora</title>
+    <title>Demo Studio Dentistico</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -30,29 +30,29 @@
     </style>
   </head>
   <body>
-    <div id="root" class="boot">Caricamento demo DentFlow AI...</div>
+    <div id="root" class="boot">Caricamento Demo Studio Dentistico...</div>
     <script>
-      async function bootDentFlow() {
-        const response = await fetch("./DentFlowAI.jsx", { cache: "no-store" });
+      async function bootDemoStudioDentistico() {
+        const response = await fetch("./DemoStudioDentistico.jsx", { cache: "no-store" });
         let source = await response.text();
 
         source = source
           .replace('import { useState, useEffect } from "react";', "const { useState, useEffect } = React;")
-          .replace("export default function DentFlowAI", "function DentFlowAI");
+          .replace("export default function DemoStudioDentistico", "function DemoStudioDentistico");
 
         const root = document.getElementById("root");
         root.className = "";
         root.textContent = "";
 
         const compiled = Babel.transform(
-          `${source}\nReactDOM.createRoot(document.getElementById("root")).render(React.createElement(DentFlowAI));`,
+          `${source}\nReactDOM.createRoot(document.getElementById("root")).render(React.createElement(DemoStudioDentistico));`,
           { presets: ["react"] }
         ).code;
 
         new Function("React", "ReactDOM", compiled)(React, ReactDOM);
       }
 
-      bootDentFlow().catch((error) => {
+      bootDemoStudioDentistico().catch((error) => {
         document.getElementById("root").innerHTML =
           '<div style="max-width:720px;padding:32px;font-family:system-ui;color:#334155"><h1>Errore nel caricamento della demo</h1><p>Avvia questa cartella con un piccolo server locale, ad esempio <code>python -m http.server 5173</code>, poi apri <code>http://localhost:5173</code>.</p><pre style="white-space:pre-wrap;background:#fee2e2;color:#991b1b;padding:16px;border-radius:8px">' +
           String(error) +
