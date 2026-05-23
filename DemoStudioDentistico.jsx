@@ -24,6 +24,111 @@ const initialSlots = [
   { time: "18:00", patient: "Elena Conti", treatment: "Visita implantologia", status: "confermato", channel: "Telefonata" },
 ];
 
+const demoAgendaDate = "2026-05-25";
+const demoAgendaLabel = "Lunedi 25 maggio";
+const demoSlotTime = "16:00";
+
+const monthDays = [
+  { key: "2026-05-01", day: 1, weekday: "Ven", label: "Venerdi 1 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
+  { key: "2026-05-02", day: 2, weekday: "Sab", label: "Sabato 2 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
+  { key: "2026-05-03", day: 3, weekday: "Dom", label: "Domenica 3 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
+  { key: "2026-05-04", day: 4, weekday: "Lun", label: "Lunedi 4 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
+  { key: "2026-05-05", day: 5, weekday: "Mar", label: "Martedi 5 maggio", closed: false, summary: "7 appuntamenti", tone: "teal" },
+  { key: "2026-05-06", day: 6, weekday: "Mer", label: "Mercoledi 6 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
+  { key: "2026-05-07", day: 7, weekday: "Gio", label: "Giovedi 7 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
+  { key: "2026-05-08", day: 8, weekday: "Ven", label: "Venerdi 8 maggio", closed: false, summary: "4 appuntamenti", tone: "slate" },
+  { key: "2026-05-09", day: 9, weekday: "Sab", label: "Sabato 9 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
+  { key: "2026-05-10", day: 10, weekday: "Dom", label: "Domenica 10 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
+  { key: "2026-05-11", day: 11, weekday: "Lun", label: "Lunedi 11 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
+  { key: "2026-05-12", day: 12, weekday: "Mar", label: "Martedi 12 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
+  { key: "2026-05-13", day: 13, weekday: "Mer", label: "Mercoledi 13 maggio", closed: false, summary: "7 appuntamenti", tone: "teal" },
+  { key: "2026-05-14", day: 14, weekday: "Gio", label: "Giovedi 14 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
+  { key: "2026-05-15", day: 15, weekday: "Ven", label: "Venerdi 15 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
+  { key: "2026-05-16", day: 16, weekday: "Sab", label: "Sabato 16 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
+  { key: "2026-05-17", day: 17, weekday: "Dom", label: "Domenica 17 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
+  { key: "2026-05-18", day: 18, weekday: "Lun", label: "Lunedi 18 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
+  { key: "2026-05-19", day: 19, weekday: "Mar", label: "Martedi 19 maggio", closed: false, summary: "4 appuntamenti", tone: "slate" },
+  { key: "2026-05-20", day: 20, weekday: "Mer", label: "Mercoledi 20 maggio", closed: false, summary: "7 appuntamenti", tone: "teal" },
+  { key: "2026-05-21", day: 21, weekday: "Gio", label: "Giovedi 21 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
+  { key: "2026-05-22", day: 22, weekday: "Ven", label: "Venerdi 22 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
+  { key: "2026-05-23", day: 23, weekday: "Sab", label: "Sabato 23 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
+  { key: "2026-05-24", day: 24, weekday: "Dom", label: "Domenica 24 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
+  { key: demoAgendaDate, day: 25, weekday: "Lun", label: demoAgendaLabel, closed: false, summary: "Scenario Fill the Gap", tone: "amber" },
+  { key: "2026-05-26", day: 26, weekday: "Mar", label: "Martedi 26 maggio", closed: false, summary: "7 appuntamenti", tone: "teal" },
+  { key: "2026-05-27", day: 27, weekday: "Mer", label: "Mercoledi 27 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
+  { key: "2026-05-28", day: 28, weekday: "Gio", label: "Giovedi 28 maggio", closed: false, summary: "4 appuntamenti", tone: "slate" },
+  { key: "2026-05-29", day: 29, weekday: "Ven", label: "Venerdi 29 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
+  { key: "2026-05-30", day: 30, weekday: "Sab", label: "Sabato 30 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
+  { key: "2026-05-31", day: 31, weekday: "Dom", label: "Domenica 31 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
+];
+
+const monthlyAgendaSlots = {
+  "2026-05-01": [
+    { time: "09:30", patient: "Nadia Villa", treatment: "Igiene dentale", status: "completato", channel: "WhatsApp" },
+    { time: "11:00", patient: "Andrea Moretti", treatment: "Controllo annuale", status: "completato", channel: "SMS" },
+    { time: "14:30", patient: "Francesca Sala", treatment: "Prima visita", status: "confermato", channel: "Email" },
+    { time: "16:00", patient: "Slot libero", treatment: "Disponibile per urgenze", status: "libero", channel: "-" },
+    { time: "17:30", patient: "Giorgio Rinaldi", treatment: "Controllo post-intervento", status: "confermato", channel: "Telefonata" },
+  ],
+  "2026-05-04": [
+    { time: "09:00", patient: "Claudia Neri", treatment: "Igiene dentale", status: "completato", channel: "WhatsApp" },
+    { time: "10:30", patient: "Matteo Costa", treatment: "Visita bambini", status: "completato", channel: "Email" },
+    { time: "12:00", patient: "Slot libero", treatment: "Pausa operativa", status: "libero", channel: "-" },
+    { time: "15:00", patient: "Alessia Fontana", treatment: "Sbiancamento", status: "confermato", channel: "SMS" },
+    { time: "17:00", patient: "Dario Rizzi", treatment: "Controllo", status: "confermato", channel: "WhatsApp" },
+  ],
+  "2026-05-05": [
+    { time: "09:00", patient: "Marta Longo", treatment: "Controllo", status: "completato", channel: "WhatsApp" },
+    { time: "10:00", patient: "Paolo Ricci", treatment: "Igiene dentale", status: "completato", channel: "SMS" },
+    { time: "11:30", patient: "Irene Serra", treatment: "Ortodonzia", status: "confermato", channel: "Email" },
+    { time: "14:00", patient: "Federico Bassi", treatment: "Devitalizzazione", status: "confermato", channel: "Telefonata" },
+    { time: "16:30", patient: "Silvia Monti", treatment: "Visita bambini", status: "confermato", channel: "WhatsApp" },
+  ],
+  "2026-05-11": [
+    { time: "09:00", patient: "Laura Martini", treatment: "Igiene dentale", status: "completato", channel: "WhatsApp" },
+    { time: "11:00", patient: "Gianni Russo", treatment: "Controllo", status: "confermato", channel: "SMS" },
+    { time: "14:00", patient: "Serena De Luca", treatment: "Prima visita", status: "confermato", channel: "Email" },
+    { time: "16:00", patient: "Slot libero", treatment: "Finestra breve", status: "libero", channel: "-" },
+    { time: "18:00", patient: "Carlo Villa", treatment: "Controllo ortodonzia", status: "confermato", channel: "WhatsApp" },
+  ],
+  "2026-05-18": [
+    { time: "09:30", patient: "Chiara Greco", treatment: "Igiene dentale", status: "completato", channel: "WhatsApp" },
+    { time: "10:30", patient: "Pietro Ferrara", treatment: "Controllo", status: "completato", channel: "SMS" },
+    { time: "12:00", patient: "Slot libero", treatment: "Disponibile per urgenze", status: "libero", channel: "-" },
+    { time: "15:30", patient: "Valentina Riva", treatment: "Sbiancamento", status: "a rischio", channel: "Email" },
+    { time: "17:30", patient: "Nicola Parisi", treatment: "Controllo post-intervento", status: "confermato", channel: "Telefonata" },
+  ],
+  "2026-05-26": [
+    { time: "09:00", patient: "Luca Bianchi", treatment: "Controllo", status: "confermato", channel: "WhatsApp" },
+    { time: "10:00", patient: "Elena Conti", treatment: "Chiarimento preventivo", status: "confermato", channel: "Telefonata" },
+    { time: "11:30", patient: "Roberto Galli", treatment: "Ortodonzia invisibile", status: "confermato", channel: "Email" },
+    { time: "14:30", patient: "Paola Esposito", treatment: "Sbiancamento", status: "confermato", channel: "Email" },
+    { time: "17:00", patient: "Antonio Greco", treatment: "Igiene dentale", status: "confermato", channel: "SMS" },
+  ],
+  "2026-05-27": [
+    { time: "09:00", patient: "Sara Colombo", treatment: "Igiene dentale", status: "confermato", channel: "WhatsApp" },
+    { time: "10:30", patient: "Marco Riva", treatment: "Controllo post-intervento", status: "confermato", channel: "SMS" },
+    { time: "12:00", patient: "Slot libero", treatment: "Finestra gestione urgenze", status: "libero", channel: "-" },
+    { time: "15:00", patient: "Giulia Ferri", treatment: "Controllo", status: "confermato", channel: "WhatsApp" },
+    { time: "18:00", patient: "Andrea Moretti", treatment: "Controllo annuale", status: "confermato", channel: "WhatsApp" },
+  ],
+};
+
+function buildDefaultSlots(day) {
+  if (!day || day.closed) return [];
+  const names = ["Maria Rossi", "Luca Bianchi", "Sara Colombo", "Elena Conti", "Marco Riva", "Giulia Ferri", "Antonio Greco"];
+  const treatments = ["Igiene dentale", "Controllo", "Visita di controllo", "Ortodonzia", "Sbiancamento", "Controllo post-intervento"];
+  const channels = ["WhatsApp", "SMS", "Email", "Telefonata"];
+  const index = day.day;
+  return [
+    { time: "09:00", patient: names[index % names.length], treatment: treatments[index % treatments.length], status: index < 23 ? "completato" : "confermato", channel: channels[index % channels.length] },
+    { time: "10:30", patient: names[(index + 2) % names.length], treatment: treatments[(index + 1) % treatments.length], status: index < 23 ? "completato" : "confermato", channel: channels[(index + 1) % channels.length] },
+    { time: "12:00", patient: "Slot libero", treatment: "Disponibile per urgenze", status: "libero", channel: "-" },
+    { time: "15:00", patient: names[(index + 4) % names.length], treatment: treatments[(index + 3) % treatments.length], status: index % 9 === 0 ? "a rischio" : "confermato", channel: channels[(index + 2) % channels.length] },
+    { time: "17:30", patient: names[(index + 5) % names.length], treatment: treatments[(index + 4) % treatments.length], status: "confermato", channel: channels[(index + 3) % channels.length] },
+  ];
+}
+
 const patients = [
   {
     name: "Maria Rossi",
@@ -48,7 +153,7 @@ const patients = [
     phone: "+39 347 882 1104",
     email: "luca.bianchi@email.it",
     lastVisit: "Controllo, 7 mesi fa",
-    nextVisit: "Domani 17:00",
+    nextVisit: "Lunedi 25 maggio, 17:00",
     consent: true,
     preferredChannel: "WhatsApp",
     treatments: "Controllo, igiene",
@@ -145,7 +250,7 @@ const patients = [
 
 const baseFollowUps = [
   { name: "Sara Colombo", reason: "Igiene dentale ogni 6 mesi", due: "Questa settimana", channel: "WhatsApp", status: "Pronto" },
-  { name: "Marco Riva", reason: "Controllo post-intervento", due: "Domani", channel: "SMS", status: "In programma" },
+  { name: "Marco Riva", reason: "Controllo post-intervento", due: "Lunedi 25 maggio", channel: "SMS", status: "In programma" },
   { name: "Elena Conti", reason: "Preventivo non confermato", due: "Oggi", channel: "Telefonata", status: "Da richiamare" },
   { name: "Andrea Moretti", reason: "Paziente inattivo", due: "Questa settimana", channel: "WhatsApp", status: "Pronto" },
 ];
@@ -159,7 +264,7 @@ const waitlist = [
 ];
 
 const candidateList = [
-  { name: "Maria Rossi", reason: "Lista d'attesa, preferenza pomeriggio, consenso attivo", channel: "WhatsApp", fit: "Molto alta", consent: true, response: "Si, confermo per domani alle 16:00." },
+  { name: "Maria Rossi", reason: "Lista d'attesa, preferenza pomeriggio, consenso attivo", channel: "WhatsApp", fit: "Molto alta", consent: true, response: "Si, confermo per lunedi 25 maggio alle 16:00." },
   { name: "Luca Bianchi", reason: "Igiene da riprogrammare, usa WhatsApp", channel: "WhatsApp", fit: "Alta", consent: true, response: "Posso solo dopo le 17:00." },
   { name: "Antonio Greco", reason: "Disponibile dopo le 16:00, canale SMS", channel: "SMS", fit: "Buona", consent: true, response: "Resto in attesa di altre date." },
   { name: "Roberto Galli", reason: "Consenso comunicazioni non attivo", channel: "Email", fit: "Escluso", consent: false, response: "Non contattato." },
@@ -189,10 +294,10 @@ const initialConversations = [
     name: "Maria Rossi",
     channel: "WhatsApp",
     status: "Risposto",
-    preview: "Si, confermo per domani alle 16:00.",
+    preview: "Si, confermo per lunedi 25 maggio alle 16:00.",
     messages: [
-      { from: "Studio", text: "Ciao Maria, si e appena liberato uno slot domani alle 16:00 per igiene dentale presso Demo Studio Dentistico. Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te." },
-      { from: "Maria", text: "Si, confermo per domani alle 16:00." },
+      { from: "Studio", text: "Ciao Maria, si e appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale presso Demo Studio Dentistico. Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te." },
+      { from: "Maria", text: "Si, confermo per lunedi 25 maggio alle 16:00." },
     ],
   },
   {
@@ -224,7 +329,7 @@ const initialConversations = [
     status: "Letto",
     preview: "Reminder consegnato.",
     messages: [
-      { from: "Studio", text: "Ciao Luca, ti ricordiamo l'appuntamento di domani alle 17:00 per il controllo. Rispondi OK per confermare." },
+      { from: "Studio", text: "Ciao Luca, ti ricordiamo l'appuntamento di lunedi 25 maggio alle 17:00 per il controllo. Rispondi OK per confermare." },
     ],
   },
 ];
@@ -301,6 +406,7 @@ function EmptyLine({ children }) {
 function DemoStudioDentisticoApp() {
   const [activeSection, setActiveSection] = useState("agenda");
   const [slots, setSlots] = useState(initialSlots);
+  const [selectedAgendaDay, setSelectedAgendaDay] = useState(demoAgendaDate);
   const [gapStatus, setGapStatus] = useState("idle");
   const [gapLog, setGapLog] = useState([]);
   const [followupActive, setFollowupActive] = useState(false);
@@ -321,6 +427,11 @@ function DemoStudioDentisticoApp() {
 
   const activeLabel = sections.find((section) => section.id === activeSection)?.label || "Agenda";
   const targetSlot = slots.find((slot) => slot.time === "16:00");
+  const selectedMonthDay = monthDays.find((day) => day.key === selectedAgendaDay) || monthDays.find((day) => day.key === demoAgendaDate);
+  const selectedDaySlots =
+    selectedAgendaDay === demoAgendaDate
+      ? slots
+      : monthlyAgendaSlots[selectedAgendaDay] || buildDefaultSlots(selectedMonthDay);
 
   useEffect(() => {
     const scrollArea = document.querySelector("[data-app-scroll]");
@@ -342,12 +453,12 @@ function DemoStudioDentisticoApp() {
     );
     setGapStatus("detected");
     setGapLog([
-      "Rinuncia ricevuta per lo slot di domani alle 16:00.",
+      "Rinuncia ricevuta per lo slot di lunedi 25 maggio alle 16:00.",
       "Sistema in ricerca di pazienti compatibili con consenso attivo.",
     ]);
     if (source === "whatsapp") {
       setWhatsappEvents((events) => [
-        "Messaggio ricevuto da Giulia Ferri: devo rinunciare all'appuntamento di domani alle 16:00.",
+        "Messaggio ricevuto da Giulia Ferri: devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00.",
         "Demo Studio Dentistico ha rilevato uno slot da riempire e ha preparato la lista dei pazienti compatibili.",
         ...events,
       ]);
@@ -355,15 +466,16 @@ function DemoStudioDentisticoApp() {
   }
 
   function simulateCancellation() {
+    setSelectedAgendaDay(demoAgendaDate);
     markSlotAsOpen("manual");
     addOrUpdateConversation({
       id: "giulia-rinuncia",
       name: "Giulia Ferri",
       channel: "WhatsApp",
       status: "Rinuncia ricevuta",
-      preview: "Devo rinunciare all'appuntamento di domani alle 16:00.",
+      preview: "Devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00.",
       messages: [
-        { from: "Giulia", text: "Buongiorno, devo rinunciare all'appuntamento di domani alle 16:00. Mi dispiace." },
+        { from: "Giulia", text: "Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace." },
         { from: "Studio", text: "Grazie per averci avvisato. Ti proponiamo nuove disponibilita appena possibile." },
       ],
     });
@@ -388,7 +500,7 @@ function DemoStudioDentisticoApp() {
 
     setTimeout(() => {
       setGapLog((current) => [
-        "Maria Rossi ha risposto: Si, confermo per domani alle 16:00.",
+        "Maria Rossi ha risposto: Si, confermo per lunedi 25 maggio alle 16:00.",
         "Luca Bianchi ha risposto: posso solo dopo le 17:00.",
         ...current,
       ]);
@@ -409,11 +521,11 @@ function DemoStudioDentisticoApp() {
         name: "Maria Rossi",
         channel: "WhatsApp",
         status: "Risposto",
-        preview: "Si, confermo per domani alle 16:00.",
+        preview: "Si, confermo per lunedi 25 maggio alle 16:00.",
         messages: [
-          { from: "Studio", text: "Ciao Maria, si e appena liberato uno slot domani alle 16:00 per igiene dentale presso Demo Studio Dentistico. Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te." },
-          { from: "Maria", text: "Si, confermo per domani alle 16:00." },
-          { from: "Studio", text: "Perfetto, appuntamento confermato. A domani." },
+          { from: "Studio", text: "Ciao Maria, si e appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale presso Demo Studio Dentistico. Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te." },
+          { from: "Maria", text: "Si, confermo per lunedi 25 maggio alle 16:00." },
+          { from: "Studio", text: "Perfetto, appuntamento confermato. A lunedi." },
         ],
       });
     }, 1500);
@@ -432,7 +544,7 @@ function DemoStudioDentisticoApp() {
       if (current.some((item) => item.name === "Maria Rossi" && item.reason === "Richiamo igiene automatico")) return current;
       return [
         { name: "Maria Rossi", reason: "Richiamo igiene automatico", due: "Oggi", channel: "WhatsApp", status: "Pronto" },
-        { name: "Antonio Greco", reason: "Richiamo igiene automatico", due: "Domani", channel: "SMS", status: "Pronto" },
+        { name: "Antonio Greco", reason: "Richiamo igiene automatico", due: "Lunedi 25 maggio", channel: "SMS", status: "Pronto" },
         ...current,
       ];
     });
@@ -450,15 +562,16 @@ function DemoStudioDentisticoApp() {
 
   function triggerWhatsappCancellation() {
     if (whatsappStatus !== "connected") return;
+    setSelectedAgendaDay(demoAgendaDate);
     markSlotAsOpen("whatsapp");
     addOrUpdateConversation({
       id: "giulia-rinuncia",
       name: "Giulia Ferri",
       channel: "WhatsApp",
       status: "Rinuncia ricevuta",
-      preview: "Devo rinunciare all'appuntamento di domani alle 16:00.",
+      preview: "Devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00.",
       messages: [
-        { from: "Giulia", text: "Buongiorno, devo rinunciare all'appuntamento di domani alle 16:00. Mi dispiace." },
+        { from: "Giulia", text: "Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace." },
         { from: "Studio", text: "Grazie per averci avvisato. Ti proponiamo nuove disponibilita appena possibile." },
       ],
     });
@@ -466,6 +579,7 @@ function DemoStudioDentisticoApp() {
 
   function resetScenario() {
     setSlots(initialSlots);
+    setSelectedAgendaDay(demoAgendaDate);
     setGapStatus("idle");
     setGapLog([]);
     setWhatsappEvents(["Scenario ripristinato. Puoi simulare una nuova rinuncia dall'agenda o da WhatsApp Web."]);
@@ -532,8 +646,12 @@ function DemoStudioDentisticoApp() {
 
         <div data-app-scroll className="min-w-0 flex-1 overflow-y-auto">
           {activeSection === "agenda" && (
-            <AgendaSection
-              slots={slots}
+            <AgendaSectionMonthly
+              monthDays={monthDays}
+              selectedAgendaDay={selectedAgendaDay}
+              setSelectedAgendaDay={setSelectedAgendaDay}
+              selectedMonthDay={selectedMonthDay}
+              selectedDaySlots={selectedDaySlots}
               targetSlot={targetSlot}
               simulateCancellation={simulateCancellation}
               resetScenario={resetScenario}
@@ -591,6 +709,136 @@ function DemoStudioDentisticoApp() {
   );
 }
 
+function AgendaSectionMonthly({
+  monthDays,
+  selectedAgendaDay,
+  setSelectedAgendaDay,
+  selectedMonthDay,
+  selectedDaySlots,
+  targetSlot,
+  simulateCancellation,
+  resetScenario,
+  setActiveSection,
+}) {
+  const weekLabels = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
+  const leadingEmptyDays = 4;
+
+  return (
+    <PageFrame title="Agenda operativa" subtitle="Vista mensile dello studio con dettaglio giornaliero. Il caso Fill the Gap resta evidenziato sul lunedi 25 maggio alle 16:00.">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
+        <div className="space-y-6">
+          <Panel className="overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
+              <div>
+                <h2 className="font-bold text-slate-950">Maggio 2026</h2>
+                <p className="mt-1 text-sm text-slate-500">Calendario completo del mese. Clicca una data per vedere gli slot della giornata.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button onClick={simulateCancellation} variant="primary">Simula rinuncia appuntamento</Button>
+                <Button onClick={resetScenario} variant="secondary">Ripristina scenario</Button>
+              </div>
+            </div>
+
+            <div className="border-b border-slate-100 px-6 py-4">
+              <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold uppercase tracking-wide text-slate-400">
+                {weekLabels.map((label) => <div key={label}>{label}</div>)}
+              </div>
+              <div className="mt-2 grid grid-cols-7 gap-2">
+                {Array.from({ length: leadingEmptyDays }).map((_, index) => (
+                  <div key={`empty-${index}`} className="min-h-[92px] rounded-lg border border-transparent" />
+                ))}
+                {monthDays.map((day) => (
+                  <button
+                    key={day.key}
+                    type="button"
+                    onClick={() => setSelectedAgendaDay(day.key)}
+                    className={classNames(
+                      "min-h-[92px] rounded-lg border p-3 text-left transition",
+                      selectedAgendaDay === day.key
+                        ? "border-teal-500 bg-teal-50 shadow-sm"
+                        : day.closed
+                          ? "border-slate-100 bg-slate-50 text-slate-400"
+                          : "border-slate-200 bg-white hover:border-teal-200 hover:bg-slate-50"
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={classNames("text-sm font-bold", selectedAgendaDay === day.key ? "text-teal-800" : "text-slate-900")}>{day.day}</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{day.weekday}</span>
+                    </div>
+                    <div className={classNames("mt-3 text-xs leading-5", day.closed ? "text-slate-400" : selectedAgendaDay === day.key ? "text-teal-700" : "text-slate-500")}>{day.summary}</div>
+                    {day.key === demoAgendaDate && <div className="mt-2 h-1.5 w-10 rounded-full bg-amber-500" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Panel>
+
+          <Panel className="overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
+              <div>
+                <h2 className="font-bold text-slate-950">{selectedMonthDay?.label} - Demo Studio Dentistico</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  {selectedMonthDay?.closed ? "Studio chiuso." : "Orario studio: lunedi-venerdi 9:00-19:00"}
+                </p>
+              </div>
+              {selectedAgendaDay !== demoAgendaDate && (
+                <Button onClick={() => setSelectedAgendaDay(demoAgendaDate)} variant="secondary">Vai allo scenario Fill the Gap</Button>
+              )}
+            </div>
+
+            {selectedMonthDay?.closed ? (
+              <div className="p-6">
+                <EmptyLine>Giornata non operativa. Seleziona un giorno feriale per vedere appuntamenti e slot disponibili.</EmptyLine>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {selectedDaySlots.map((slot) => (
+                  <div key={`${selectedAgendaDay}-${slot.time}`} className={classNames("grid grid-cols-[90px_1fr_170px_150px] items-center gap-4 px-6 py-4 text-sm", slot.status === "da riempire" ? "bg-rose-50/70" : slot.status === "riempito" ? "bg-teal-50/80" : "")}>
+                    <div className="font-mono text-sm font-bold text-slate-600">{slot.time}</div>
+                    <div>
+                      <div className="font-semibold text-slate-950">{slot.patient}</div>
+                      <div className="mt-0.5 text-slate-500">{slot.treatment}</div>
+                    </div>
+                    <div className="text-slate-500">{slot.channel}</div>
+                    <div className="text-right">
+                      <span className={classNames("inline-flex rounded-full border px-3 py-1 text-xs font-semibold", statusStyle(slot.status))}>{slot.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
+
+        <div className="space-y-6">
+          <Panel className="p-6">
+            <h3 className="font-bold text-slate-950">Scenario demo</h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              Lo slot delle 16:00 di lunedi 25 maggio e il punto centrale della simulazione. Quando il paziente rinuncia, il sistema prepara il Fill the Gap e suggerisce chi contattare.
+            </p>
+            <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Slot monitorato</div>
+              <div className="mt-2 text-lg font-bold text-slate-950">25 maggio, 16:00 - {targetSlot?.treatment}</div>
+              <div className="mt-2"><span className={classNames("inline-flex rounded-full border px-3 py-1 text-xs font-semibold", statusStyle(targetSlot?.status))}>{targetSlot?.status}</span></div>
+            </div>
+            <Button onClick={() => setActiveSection("fillgap")} variant="secondary" className="mt-5 w-full">Apri Fill the Gap</Button>
+          </Panel>
+
+          <Panel className="p-6">
+            <h3 className="font-bold text-slate-950">Flusso previsto</h3>
+            <div className="mt-4 space-y-3 text-sm text-slate-600">
+              <StepLine step="1" text="Rinuncia ricevuta da agenda o WhatsApp." />
+              <StepLine step="2" text="Ricerca pazienti compatibili con consenso attivo." />
+              <StepLine step="3" text="Invio messaggi su canale preferito." />
+              <StepLine step="4" text="Prima conferma valida aggiorna l'agenda." />
+            </div>
+          </Panel>
+        </div>
+      </div>
+    </PageFrame>
+  );
+}
+
 function AgendaSection({ slots, targetSlot, simulateCancellation, resetScenario, setActiveSection }) {
   return (
     <PageFrame title="Agenda operativa" subtitle="La demo parte da una situazione reale: un paziente rinuncia a un appuntamento e lo studio deve decidere come gestire lo slot senza chiamate manuali disordinate.">
@@ -598,7 +846,7 @@ function AgendaSection({ slots, targetSlot, simulateCancellation, resetScenario,
         <Panel className="overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
             <div>
-              <h2 className="font-bold text-slate-950">Domani · Demo Studio Dentistico</h2>
+              <h2 className="font-bold text-slate-950">Lunedi 25 maggio - Demo Studio Dentistico</h2>
               <p className="mt-1 text-sm text-slate-500">Orario studio: lunedi-venerdi 9:00-19:00</p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -671,7 +919,7 @@ function FillGapSection({ status, log, slot, simulateCancellation, runCampaign, 
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Slot da gestire</div>
-                <h2 className="mt-2 text-xl font-bold text-slate-950">Domani 16:00 · Igiene dentale</h2>
+                <h2 className="mt-2 text-xl font-bold text-slate-950">Lunedi 25 maggio, 16:00 - Igiene dentale</h2>
                 <p className="mt-2 text-sm text-slate-600">
                   Stato attuale: <span className={classNames("ml-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusStyle(slot?.status))}>{slot?.status}</span>
                 </p>
@@ -722,7 +970,7 @@ function FillGapSection({ status, log, slot, simulateCancellation, runCampaign, 
           <Panel className="p-6">
             <h3 className="font-bold text-slate-950">Anteprima messaggio</h3>
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-              Ciao Maria, si e appena liberato uno slot domani alle 16:00 per igiene dentale presso Demo Studio Dentistico.
+              Ciao Maria, si e appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale presso Demo Studio Dentistico.
               Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te.
             </div>
             <p className="mt-3 text-xs leading-5 text-slate-500">
@@ -749,7 +997,7 @@ function FillGapSection({ status, log, slot, simulateCancellation, runCampaign, 
             <h3 className="font-bold text-slate-950">Esito operativo</h3>
             {status === "filled" ? (
               <div className="mt-4 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm leading-6 text-teal-800">
-                Maria Rossi ha confermato. Lo slot delle 16:00 risulta aggiornato in agenda e la segreteria puo proseguire senza chiamate manuali.
+                Maria Rossi ha confermato. Lo slot di lunedi 25 maggio alle 16:00 risulta aggiornato in agenda e la segreteria puo proseguire senza chiamate manuali.
               </div>
             ) : (
               <div className="mt-4 text-sm leading-6 text-slate-600">
@@ -1170,7 +1418,7 @@ function WhatsAppSection({ status, events, connect, triggerCancellation, setActi
           <Panel className="p-6">
             <h2 className="font-bold text-slate-950">Messaggio di rinuncia demo</h2>
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-              Buongiorno, devo rinunciare all'appuntamento di domani alle 16:00. Mi dispiace.
+              Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace.
             </div>
             <p className="mt-4 text-sm leading-6 text-slate-600">
               Dopo il messaggio, il sistema cambia lo slot in "da riempire", prepara i pazienti compatibili e lascia allo staff il controllo dell'invio.
