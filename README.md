@@ -43,6 +43,10 @@ La webapp riconosce la rinuncia, aggiorna lo slot dell'agenda e apre il flusso F
 
 Nella stessa sezione puoi anche generare il `QR paziente`: inserisci il numero WhatsApp dello studio con prefisso internazionale, ad esempio `393331234567`, e il QR aprira direttamente una chat WhatsApp verso quello studio con il messaggio di rinuncia gia compilato. Il paziente dovra solo premere invio.
 
+Per evitare la chat con se stessi, usa due account WhatsApp distinti: uno collegato come studio nella demo e uno usato come paziente per scansionare il QR. Se scansioni il QR paziente con lo stesso numero indicato come studio, WhatsApp aprira una chat con te stesso.
+
+Quando il messaggio di rinuncia arriva al WhatsApp collegato come studio, la demo rileva automaticamente la rinuncia, aggiorna lo slot del 25 maggio alle 16:00 e avvia il flusso Fill the Gap.
+
 ## Deploy
 
 Il progetto è pronto per hosting statico.

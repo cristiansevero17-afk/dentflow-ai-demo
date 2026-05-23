@@ -564,10 +564,11 @@ function DemoStudioDentisticoApp() {
     });
   }
 
-  function runFillGapCampaign() {
-    if (gapStatus === "filled") return;
+  function runFillGapCampaign(mode = "manual", force = false) {
+    if (!force && gapStatus === "filled") return;
     setGapStatus("sending");
     setGapLog([
+      mode === "auto" ? "Automazione Fill the Gap avviata dopo rinuncia WhatsApp reale." : "Campagna Fill the Gap avviata dallo staff.",
       "Messaggi preparati solo per pazienti con consenso attivo.",
       "Invio in corso su WhatsApp e SMS secondo preferenza del paziente.",
     ]);
@@ -708,6 +709,7 @@ function DemoStudioDentisticoApp() {
       ],
     });
     setActiveSection("fillgap");
+    setTimeout(() => runFillGapCampaign("auto", true), 900);
   }
 
   async function generatePatientQr() {
@@ -1569,9 +1571,9 @@ function WhatsAppSection({
         <Panel className="p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="font-bold text-slate-950">QR collegamento studio</h2>
+              <h2 className="font-bold text-slate-950">Setup interno ricezione</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Questo QR serve solo a collegare WhatsApp Web dello studio: va scansionato da WhatsApp, sezione dispositivi collegati.
+                Serve solo al software per leggere i messaggi ricevuti dallo studio. Non e il QR da mostrare al paziente.
               </p>
             </div>
             <Badge tone={realWhatsapp.status === "connected" ? "teal" : realWhatsapp.status === "qr" || realWhatsapp.status === "starting" ? "amber" : "slate"}>
@@ -1582,14 +1584,20 @@ function WhatsAppSection({
           <div className="mt-6 flex justify-center">
             {realWhatsapp.qr ? (
               <img src={realWhatsapp.qr} alt="QR WhatsApp reale demo" className="h-64 w-64 rounded-lg border border-slate-200 bg-white p-3 shadow-sm" />
+            ) : realWhatsapp.status === "connected" ? (
+              <div className="flex h-36 w-full items-center justify-center rounded-lg border border-teal-200 bg-teal-50 px-4 text-center text-sm font-semibold leading-6 text-teal-800">
+                WhatsApp dello studio collegato. Ora genera il QR paziente.
+              </div>
             ) : (
-              <QrDemo active={realWhatsapp.status === "connected" || status !== "not_connected"} />
+              <div className="flex h-36 w-full items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-sm leading-6 text-slate-500">
+                Clicca "Collega WhatsApp dello studio" per generare il QR tecnico di accesso.
+              </div>
             )}
           </div>
 
           <div className="mt-6 space-y-3">
             <Button onClick={connectReal} disabled={realWhatsapp.status === "connected" || realWhatsapp.status === "starting"} className="w-full">
-              {realWhatsapp.status === "connected" ? "WhatsApp reale collegato" : realWhatsapp.status === "starting" ? "Avvio collegamento reale" : "Collega WhatsApp reale"}
+              {realWhatsapp.status === "connected" ? "WhatsApp dello studio collegato" : realWhatsapp.status === "starting" ? "Avvio collegamento" : "Collega WhatsApp dello studio"}
             </Button>
             <Button onClick={disconnectReal} disabled={!realWhatsapp.available || realWhatsapp.status === "offline"} variant="secondary" className="w-full">
               Disconnetti collegamento reale
@@ -1610,6 +1618,9 @@ function WhatsAppSection({
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   Questo e il QR da far inquadrare a un paziente: apre WhatsApp direttamente nella chat dello studio con la rinuncia gia pronta.
                 </p>
+                <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                  Usa come numero target quello dello studio. Il QR va inquadrato da un altro WhatsApp: se lo scansioni con lo stesso account dello studio, WhatsApp apre una chat con te stesso.
+                </p>
               </div>
               <Badge tone={patientQr.qr ? "teal" : "slate"}>{patientQr.qr ? "QR pronto" : "Da generare"}</Badge>
             </div>
@@ -1623,6 +1634,11 @@ function WhatsAppSection({
                     placeholder="393331234567"
                     className="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500"
                   />
+                  {realWhatsapp.studioNumber && (
+                    <div className="mt-2 text-xs leading-5 text-slate-500">
+                      Numero rilevato dal collegamento studio: {realWhatsapp.studioNumber}
+                    </div>
+                  )}
                 </div>
                 <Button onClick={generatePatientQr} disabled={patientQr.loading} variant="secondary">
                   {patientQr.loading ? "Genero QR" : "Genera QR chat paziente"}
@@ -1672,7 +1688,7 @@ function WhatsAppSection({
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-bold text-slate-950">Eventi in tempo reale</h2>
-                <p className="mt-1 text-sm text-slate-500">Quando arriva una rinuncia vera o simulata, il sistema apre lo scenario Fill the Gap.</p>
+                <p className="mt-1 text-sm text-slate-500">Quando arriva una rinuncia vera, il sistema notifica lo slot, apre il Fill the Gap e avvia automaticamente la campagna demo.</p>
               </div>
               <Button variant="secondary" onClick={() => setActiveSection("fillgap")}>Apri Fill the Gap</Button>
             </div>
