@@ -15,6 +15,7 @@ app.use(express.static(rootDir));
 
 let client = null;
 let qrDataUrl = null;
+let studioNumber = null;
 let status = "idle";
 let lastError = null;
 const eventClients = new Set();
@@ -35,8 +36,17 @@ function snapshot() {
   return {
     status,
     qr: qrDataUrl,
+    studioNumber,
     error: lastError,
   };
+}
+
+function normalizePhoneNumber(value) {
+  return String(value || "").replace(/[^\d]/g, "");
+}
+
+function defaultCancellationText() {
+  return "Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace.";
 }
 
 function sendSse(res, event, payload) {
@@ -108,6 +118,7 @@ async function ensureClient() {
   });
 
   client.on("ready", () => {
+    studioNumber = client.info?.wid?.user || studioNumber;
     setStatus("connected", { qr: null, error: null });
     publish("log", { message: "WhatsApp reale collegato. In attesa di messaggi demo." });
   });
@@ -135,6 +146,7 @@ async function ensureClient() {
   client.on("disconnected", (reason) => {
     client = null;
     qrDataUrl = null;
+    studioNumber = null;
     setStatus("disconnected", { qr: null, error: reason || null });
     publish("log", { message: "WhatsApp disconnesso. Puoi ripetere il collegamento." });
   });
@@ -144,6 +156,7 @@ async function ensureClient() {
   } catch (error) {
     client = null;
     qrDataUrl = null;
+    studioNumber = null;
     setStatus("error", { qr: null, error: error.message || String(error) });
   }
 
@@ -165,8 +178,25 @@ app.post("/api/whatsapp/disconnect", async (_req, res) => {
   }
   client = null;
   qrDataUrl = null;
+  studioNumber = null;
   setStatus("idle", { qr: null, error: null });
   res.json(snapshot());
+});
+
+app.get("/api/whatsapp/chat-qr", async (req, res) => {
+  const phone = normalizePhoneNumber(req.query.phone || studioNumber);
+  const text = String(req.query.text || defaultCancellationText());
+
+  if (!phone) {
+    res.status(400).json({
+      error: "Inserisci il numero WhatsApp dello studio in formato internazionale, ad esempio 393331234567.",
+    });
+    return;
+  }
+
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+  const qr = await qrcode.toDataURL(url, { margin: 1, width: 256 });
+  res.json({ phone, text, url, qr });
 });
 
 app.get("/api/whatsapp/events", (req, res) => {

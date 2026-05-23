@@ -41,6 +41,8 @@ Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi 
 
 La webapp riconosce la rinuncia, aggiorna lo slot dell'agenda e apre il flusso Fill the Gap. Questa modalita e pensata solo per demo locale; per produzione va usato un canale WhatsApp Business autorizzato.
 
+Nella stessa sezione puoi anche generare il `QR paziente`: inserisci il numero WhatsApp dello studio con prefisso internazionale, ad esempio `393331234567`, e il QR aprira direttamente una chat WhatsApp verso quello studio con il messaggio di rinuncia gia compilato. Il paziente dovra solo premere invio.
+
 ## Deploy
 
 Il progetto è pronto per hosting statico.

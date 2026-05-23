@@ -427,7 +427,15 @@ function DemoStudioDentisticoApp() {
     available: false,
     status: "offline",
     qr: null,
+    studioNumber: null,
     error: null,
+  });
+  const [patientQr, setPatientQr] = useState({
+    phone: "",
+    qr: null,
+    url: "",
+    error: "",
+    loading: false,
   });
   const [whatsappEvents, setWhatsappEvents] = useState([
     "Sistema pronto per ricevere messaggi operativi dai pazienti collegati alla demo.",
@@ -467,6 +475,7 @@ function DemoStudioDentisticoApp() {
           available: true,
           status: data.status || "idle",
           qr: data.qr || null,
+          studioNumber: data.studioNumber || null,
           error: data.error || null,
         });
 
@@ -477,6 +486,7 @@ function DemoStudioDentisticoApp() {
             available: true,
             status: payload.status || "idle",
             qr: payload.qr || null,
+            studioNumber: payload.studioNumber || null,
             error: payload.error || null,
           });
         });
@@ -493,6 +503,7 @@ function DemoStudioDentisticoApp() {
             available: false,
             status: "offline",
             qr: null,
+            studioNumber: null,
             error: "Server WhatsApp locale non avviato",
           });
         }
@@ -650,6 +661,7 @@ function DemoStudioDentisticoApp() {
         available: true,
         status: data.status || "starting",
         qr: data.qr || null,
+        studioNumber: data.studioNumber || null,
         error: data.error || null,
       });
       setWhatsappEvents((events) => ["Collegamento reale avviato. Se compare il QR, scansionalo da WhatsApp sul telefono.", ...events]);
@@ -658,6 +670,7 @@ function DemoStudioDentisticoApp() {
         available: false,
         status: "offline",
         qr: null,
+        studioNumber: null,
         error: "Avvia prima il server locale con npm.cmd run whatsapp-demo",
       });
       setWhatsappEvents((events) => ["Server WhatsApp locale non raggiungibile. Avvia npm.cmd run whatsapp-demo e ricarica la demo.", ...events]);
@@ -695,6 +708,39 @@ function DemoStudioDentisticoApp() {
       ],
     });
     setActiveSection("fillgap");
+  }
+
+  async function generatePatientQr() {
+    const phone = (patientQr.phone || realWhatsapp.studioNumber || "").replace(/[^\d]/g, "");
+    const text = "Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace.";
+
+    if (!phone) {
+      setPatientQr((current) => ({
+        ...current,
+        error: "Inserisci il numero WhatsApp dello studio con prefisso internazionale, ad esempio 393331234567.",
+      }));
+      return;
+    }
+
+    try {
+      setPatientQr((current) => ({ ...current, phone, loading: true, error: "" }));
+      const response = await fetch(`${whatsappLocalServerUrl}/api/whatsapp/chat-qr?phone=${encodeURIComponent(phone)}&text=${encodeURIComponent(text)}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Impossibile generare il QR paziente");
+      setPatientQr({
+        phone: data.phone,
+        qr: data.qr,
+        url: data.url,
+        error: "",
+        loading: false,
+      });
+    } catch (error) {
+      setPatientQr((current) => ({
+        ...current,
+        loading: false,
+        error: "Avvia il server locale e inserisci un numero WhatsApp valido dello studio.",
+      }));
+    }
   }
 
   function resetScenario() {
@@ -818,10 +864,13 @@ function DemoStudioDentisticoApp() {
             <WhatsAppSection
               status={whatsappStatus}
               realWhatsapp={realWhatsapp}
+              patientQr={patientQr}
+              setPatientQr={setPatientQr}
               events={whatsappEvents}
               connect={connectWhatsAppDemo}
               connectReal={connectRealWhatsApp}
               disconnectReal={disconnectRealWhatsApp}
+              generatePatientQr={generatePatientQr}
               triggerCancellation={triggerWhatsappCancellation}
               setActiveSection={setActiveSection}
             />
@@ -1491,7 +1540,19 @@ function MessagesSection({ conversations, selected, setSelected, setActiveSectio
   );
 }
 
-function WhatsAppSection({ status, realWhatsapp, events, connect, connectReal, disconnectReal, triggerCancellation, setActiveSection }) {
+function WhatsAppSection({
+  status,
+  realWhatsapp,
+  patientQr,
+  setPatientQr,
+  events,
+  connect,
+  connectReal,
+  disconnectReal,
+  generatePatientQr,
+  triggerCancellation,
+  setActiveSection,
+}) {
   const realStatusLabel = {
     offline: "Server locale spento",
     idle: "Pronto",
@@ -1508,9 +1569,9 @@ function WhatsAppSection({ status, realWhatsapp, events, connect, connectReal, d
         <Panel className="p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="font-bold text-slate-950">WhatsApp reale demo locale</h2>
+              <h2 className="font-bold text-slate-950">QR collegamento studio</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Per il colloquio puoi collegare il tuo WhatsApp con QR reale. Funziona solo se il server locale e acceso sul tuo PC.
+                Questo QR serve solo a collegare WhatsApp Web dello studio: va scansionato da WhatsApp, sezione dispositivi collegati.
               </p>
             </div>
             <Badge tone={realWhatsapp.status === "connected" ? "teal" : realWhatsapp.status === "qr" || realWhatsapp.status === "starting" ? "amber" : "slate"}>
@@ -1542,6 +1603,49 @@ function WhatsAppSection({ status, realWhatsapp, events, connect, connectReal, d
         </Panel>
 
         <div className="space-y-6">
+          <Panel className="p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="font-bold text-slate-950">QR paziente per aprire la chat</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Questo e il QR da far inquadrare a un paziente: apre WhatsApp direttamente nella chat dello studio con la rinuncia gia pronta.
+                </p>
+              </div>
+              <Badge tone={patientQr.qr ? "teal" : "slate"}>{patientQr.qr ? "QR pronto" : "Da generare"}</Badge>
+            </div>
+            <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_220px]">
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Numero WhatsApp dello studio</label>
+                  <input
+                    value={patientQr.phone || realWhatsapp.studioNumber || ""}
+                    onChange={(event) => setPatientQr((current) => ({ ...current, phone: event.target.value, error: "" }))}
+                    placeholder="393331234567"
+                    className="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500"
+                  />
+                </div>
+                <Button onClick={generatePatientQr} disabled={patientQr.loading} variant="secondary">
+                  {patientQr.loading ? "Genero QR" : "Genera QR chat paziente"}
+                </Button>
+                {patientQr.url && (
+                  <a href={patientQr.url} target="_blank" rel="noreferrer" className="block break-all text-xs leading-5 text-teal-700">
+                    {patientQr.url}
+                  </a>
+                )}
+                {patientQr.error && <div className="rounded-md border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-700">{patientQr.error}</div>}
+              </div>
+              <div className="flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 p-4">
+                {patientQr.qr ? (
+                  <img src={patientQr.qr} alt="QR chat WhatsApp paziente" className="h-44 w-44 rounded-md bg-white p-2" />
+                ) : (
+                  <div className="text-center text-xs leading-5 text-slate-500">
+                    Il QR comparira qui dopo aver inserito il numero dello studio.
+                  </div>
+                )}
+              </div>
+            </div>
+          </Panel>
+
           <Panel className="p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
