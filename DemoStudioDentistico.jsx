@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 
 const sections = [
+  { id: "guidata", label: "Demo guidata", mark: "DG", emoji: "🎬", preview: "Scenari pronti per mostrare Fill the Gap, follow-up e preventivi." },
   { id: "agenda", label: "Agenda", mark: "AG", emoji: "📅", preview: "Calendario mensile, slot liberi e rinunce da gestire." },
   { id: "fillgap", label: "Fill the Gap", mark: "FG", emoji: "⚡", preview: "Simula una rinuncia e riempi automaticamente lo slot." },
   { id: "followup", label: "Follow-up", mark: "FU", emoji: "🔁", preview: "Richiami automatici per controlli, igiene e pazienti inattivi." },
@@ -480,7 +481,7 @@ function NotificationCenter({ notifications, setActiveSection }) {
   );
 }
 
-function HomeScreen({ sections, notifications, timelineSteps, startGuidedScenario, runDaySimulation, setActiveSection }) {
+function HomeScreen({ sections, setActiveSection }) {
   return (
     <div className="min-h-screen w-screen overflow-y-auto bg-slate-50 font-sans text-slate-900">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-8 lg:px-10">
@@ -504,38 +505,6 @@ function HomeScreen({ sections, notifications, timelineSteps, startGuidedScenari
             </p>
           </div>
 
-          <div className="mt-9 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
-            <Panel className="p-5">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <h2 className="font-bold text-slate-950">Demo guidata</h2>
-                  <p className="mt-1 text-sm leading-6 text-slate-500">Tre scenari pronti da mostrare al titolare dello studio.</p>
-                </div>
-                <Button onClick={runDaySimulation} variant="secondary">Simula giornata di studio</Button>
-              </div>
-              <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-3">
-                {guidedScenarios.map((scenario) => (
-                  <button
-                    key={scenario.id}
-                    type="button"
-                    onClick={() => startGuidedScenario(scenario.id)}
-                    className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-teal-200 hover:bg-white hover:shadow-sm"
-                  >
-                    <div className="text-xs font-semibold uppercase tracking-wide text-teal-700">{scenario.section}</div>
-                    <div className="mt-2 font-bold text-slate-950">{scenario.title}</div>
-                    <p className="mt-2 min-h-[48px] text-sm leading-6 text-slate-500">{scenario.preview}</p>
-                    <div className="mt-3 text-sm font-semibold text-teal-700">{scenario.action}</div>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-6">
-                <ScenarioTimeline steps={timelineSteps} />
-              </div>
-            </Panel>
-
-            <NotificationCenter notifications={notifications} setActiveSection={setActiveSection} />
-          </div>
-
           <div className="mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {sections.map((section) => (
               <button
@@ -557,6 +526,47 @@ function HomeScreen({ sections, notifications, timelineSteps, startGuidedScenari
         </main>
       </div>
     </div>
+  );
+}
+
+function GuidedDemoSection({ notifications, timelineSteps, startGuidedScenario, runDaySimulation, setActiveSection }) {
+  return (
+    <PageFrame title="Demo guidata" subtitle="Scenari pronti per mostrare al titolare dello studio come la webapp reagisce a situazioni operative reali.">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
+        <Panel className="p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h2 className="font-bold text-slate-950">Scenari dimostrativi</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">Scegli uno scenario singolo o simula una giornata completa di studio.</p>
+            </div>
+            <Button onClick={runDaySimulation} variant="secondary">Simula giornata di studio</Button>
+          </div>
+
+          <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-3">
+            {guidedScenarios.map((scenario) => (
+              <button
+                key={scenario.id}
+                type="button"
+                onClick={() => startGuidedScenario(scenario.id)}
+                className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-teal-200 hover:bg-white hover:shadow-sm"
+              >
+                <div className="text-xs font-semibold uppercase tracking-wide text-teal-700">{scenario.section}</div>
+                <div className="mt-2 font-bold text-slate-950">{scenario.title}</div>
+                <p className="mt-2 min-h-[48px] text-sm leading-6 text-slate-500">{scenario.preview}</p>
+                <div className="mt-3 text-sm font-semibold text-teal-700">{scenario.action}</div>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-6">
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Timeline scenario</div>
+            <ScenarioTimeline steps={timelineSteps} />
+          </div>
+        </Panel>
+
+        <NotificationCenter notifications={notifications} setActiveSection={setActiveSection} />
+      </div>
+    </PageFrame>
   );
 }
 
@@ -1125,16 +1135,7 @@ function DemoStudioDentisticoApp() {
   }
 
   if (activeSection === "home") {
-    return (
-      <HomeScreen
-        sections={sections}
-        notifications={notifications}
-        timelineSteps={timelineSteps}
-        startGuidedScenario={startGuidedScenario}
-        runDaySimulation={runDaySimulation}
-        setActiveSection={setActiveSection}
-      />
-    );
+    return <HomeScreen sections={sections} setActiveSection={setActiveSection} />;
   }
 
   return (
@@ -1184,6 +1185,15 @@ function DemoStudioDentisticoApp() {
         </header>
 
         <div data-app-scroll className="min-w-0 flex-1 overflow-y-scroll">
+          {activeSection === "guidata" && (
+            <GuidedDemoSection
+              notifications={notifications}
+              timelineSteps={timelineSteps}
+              startGuidedScenario={startGuidedScenario}
+              runDaySimulation={runDaySimulation}
+              setActiveSection={setActiveSection}
+            />
+          )}
           {activeSection === "agenda" && (
             <AgendaSectionMonthly
               monthDays={monthDays}
