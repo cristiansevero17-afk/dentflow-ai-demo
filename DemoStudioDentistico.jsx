@@ -1,15 +1,15 @@
 import { useState, useEffect } from "react";
 
 const sections = [
-  { id: "guidata", label: "Demo guidata", mark: "DG", emoji: "🎬", preview: "Scenari pronti per mostrare Fill the Gap, follow-up e preventivi." },
-  { id: "agenda", label: "Agenda", mark: "AG", emoji: "📅", preview: "Calendario mensile, slot liberi e rinunce da gestire." },
-  { id: "fillgap", label: "Fill the Gap", mark: "FG", emoji: "⚡", preview: "Simula una rinuncia e riempi automaticamente lo slot." },
-  { id: "followup", label: "Follow-up", mark: "FU", emoji: "🔁", preview: "Richiami automatici per controlli, igiene e pazienti inattivi." },
-  { id: "pazienti", label: "Pazienti", mark: "PZ", emoji: "👤", preview: "CRM con consensi, preferenze, storico e prossime azioni." },
-  { id: "attesa", label: "Lista d'attesa", mark: "LA", emoji: "⏳", preview: "Pazienti disponibili per appuntamenti anticipati." },
-  { id: "preventivi", label: "Preventivi", mark: "PV", emoji: "📋", preview: "Follow-up ordinato sui preventivi aperti." },
-  { id: "automazioni", label: "Automazioni", mark: "AU", emoji: "⚙️", preview: "Regole attive, trigger, canali e stato dei flussi." },
-  { id: "messaggi", label: "Messaggi", mark: "MS", emoji: "💬", preview: "Inbox simulata per WhatsApp, SMS ed email." },
+  { id: "guidata", label: "Demo guidata", emoji: "🎬", preview: "Scenari pronti per mostrare Fill the Gap, follow-up e preventivi." },
+  { id: "agenda", label: "Agenda", emoji: "📅", preview: "Calendario mensile, slot liberi e rinunce da gestire." },
+  { id: "fillgap", label: "Fill the Gap", emoji: "⚡", preview: "Simula una rinuncia e riempi automaticamente lo slot." },
+  { id: "followup", label: "Follow-up", emoji: "🔁", preview: "Richiami automatici per controlli, igiene e pazienti inattivi." },
+  { id: "pazienti", label: "Pazienti", emoji: "👤", preview: "CRM con consensi, preferenze, storico e prossime azioni." },
+  { id: "attesa", label: "Lista d'attesa", emoji: "⏳", preview: "Pazienti disponibili per appuntamenti anticipati." },
+  { id: "preventivi", label: "Preventivi", emoji: "📋", preview: "Follow-up ordinato sui preventivi aperti." },
+  { id: "automazioni", label: "Automazioni", emoji: "⚙️", preview: "Regole attive, trigger, canali e stato dei flussi." },
+  { id: "messaggi", label: "Messaggi", emoji: "💬", preview: "Inbox simulata per WhatsApp, SMS ed email." },
 ];
 
 const guidedScenarios = [
@@ -493,7 +493,6 @@ function HomeScreen({ sections, setActiveSection }) {
               <div className="text-sm text-slate-500">Studio demo · Milano</div>
             </div>
           </div>
-          <Badge tone="teal">Sistema demo pronto</Badge>
         </header>
 
         <main className="py-10">
@@ -513,9 +512,8 @@ function HomeScreen({ sections, setActiveSection }) {
                 onClick={() => setActiveSection(section.id)}
                 className="group min-h-[180px] rounded-lg border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md"
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
                   <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-2xl" aria-hidden="true">{section.emoji}</span>
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 transition group-hover:text-teal-700">{section.mark}</span>
                 </div>
                 <div className="mt-5 text-lg font-bold text-slate-950">{section.label}</div>
                 <p className="mt-2 min-h-[48px] text-sm leading-6 text-slate-500">{section.preview}</p>
@@ -1178,9 +1176,6 @@ function DemoStudioDentisticoApp() {
           <div>
             <div className="text-sm font-bold text-slate-950">{activeLabel}</div>
             <div className="mt-1 text-xs text-slate-500">Console demo · simulazione studio dentistico</div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Badge tone="teal">Sistema demo pronto</Badge>
           </div>
         </header>
 
