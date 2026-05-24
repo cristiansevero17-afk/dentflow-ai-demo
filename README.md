@@ -33,7 +33,7 @@ Poi apri:
 http://localhost:8787
 ```
 
-Nella sezione WhatsApp Web clicca `Collega WhatsApp reale`, scansiona il QR dal telefono e fai arrivare un messaggio simile a:
+La navigazione principale della demo resta focalizzata su agenda, Fill the Gap e follow-up. Il bridge WhatsApp locale e disponibile solo come supporto tecnico per test controllati: collega un account studio separato e fai arrivare un messaggio simile a:
 
 ```text
 Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace.
@@ -41,7 +41,7 @@ Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi 
 
 La webapp riconosce la rinuncia, aggiorna lo slot dell'agenda e apre il flusso Fill the Gap. Questa modalita e pensata solo per demo locale; per produzione va usato un canale WhatsApp Business autorizzato.
 
-Nella stessa sezione puoi anche generare il `QR paziente`: inserisci il numero WhatsApp dello studio con prefisso internazionale, ad esempio `393331234567`, e il QR aprira direttamente una chat WhatsApp verso quello studio con il messaggio di rinuncia gia compilato. Il paziente dovra solo premere invio.
+Se prepari un QR paziente esterno alla UI, usa il numero WhatsApp dello studio con prefisso internazionale, ad esempio `393331234567`: il QR deve aprire una chat WhatsApp verso quello studio con il messaggio di rinuncia gia compilato. Il paziente dovra solo premere invio.
 
 Per evitare la chat con se stessi, usa due account WhatsApp distinti: uno collegato come studio nella demo e uno usato come paziente per scansionare il QR. Se scansioni il QR paziente con lo stesso numero indicato come studio, WhatsApp aprira una chat con te stesso.
 

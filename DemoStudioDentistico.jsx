@@ -9,7 +9,6 @@ const sections = [
   { id: "preventivi", label: "Preventivi", mark: "PV" },
   { id: "automazioni", label: "Automazioni", mark: "AU" },
   { id: "messaggi", label: "Messaggi", mark: "MS" },
-  { id: "whatsapp", label: "WhatsApp Web", mark: "WA" },
 ];
 
 const whatsappLocalServerUrl = "http://localhost:8787";
@@ -413,6 +412,9 @@ function DemoStudioDentisticoApp() {
   const [gapLog, setGapLog] = useState([]);
   const [followupActive, setFollowupActive] = useState(false);
   const [followupQueue, setFollowupQueue] = useState(baseFollowUps);
+  const [followupLog, setFollowupLog] = useState([
+    "Automazione richiamo igiene in bozza. Premi Attiva follow-up igiene per simulare l'avvio del processo.",
+  ]);
   const [selectedPatient, setSelectedPatient] = useState(patients[0]);
   const [patientFilter, setPatientFilter] = useState("Tutti");
   const [patientSearch, setPatientSearch] = useState("");
@@ -442,7 +444,6 @@ function DemoStudioDentisticoApp() {
   ]);
 
   const activeLabel = sections.find((section) => section.id === activeSection)?.label || "Agenda";
-  const whatsappHeaderConnected = whatsappStatus === "connected" || realWhatsapp.status === "connected";
   const targetSlot = slots.find((slot) => slot.time === "16:00");
   const selectedMonthDay = monthDays.find((day) => day.key === selectedAgendaDay) || monthDays.find((day) => day.key === demoAgendaDate);
   const selectedDaySlots =
@@ -608,6 +609,12 @@ function DemoStudioDentisticoApp() {
 
   function activateFollowup() {
     setFollowupActive(true);
+    setFollowupLog([
+      "Automazione richiamo igiene attivata.",
+      "Il sistema ha letto le ultime igieni registrate e ha individuato i pazienti vicini alla scadenza.",
+      "Maria Rossi e Antonio Greco sono stati aggiunti alla coda follow-up con canale e consenso verificati.",
+      "Il template del messaggio e pronto per invio o revisione da parte dello staff.",
+    ]);
     setAutomations((current) =>
       current.map((automation) =>
         automation.name === "Richiamo igiene ogni 6 mesi"
@@ -618,8 +625,8 @@ function DemoStudioDentisticoApp() {
     setFollowupQueue((current) => {
       if (current.some((item) => item.name === "Maria Rossi" && item.reason === "Richiamo igiene automatico")) return current;
       return [
-        { name: "Maria Rossi", reason: "Richiamo igiene automatico", due: "Oggi", channel: "WhatsApp", status: "Pronto" },
-        { name: "Antonio Greco", reason: "Richiamo igiene automatico", due: "Lunedi 25 maggio", channel: "SMS", status: "Pronto" },
+        { name: "Maria Rossi", reason: "Richiamo igiene automatico", due: "Oggi", channel: "WhatsApp", status: "Pronto per invio" },
+        { name: "Antonio Greco", reason: "Richiamo igiene automatico", due: "Lunedi 25 maggio", channel: "SMS", status: "In coda" },
         ...current,
       ];
     });
@@ -631,7 +638,7 @@ function DemoStudioDentisticoApp() {
     setWhatsappEvents((events) => ["QR demo generato. In attesa di collegamento con il dispositivo dello studio.", ...events]);
     setTimeout(() => {
       setWhatsappStatus("connected");
-      setWhatsappEvents((events) => ["WhatsApp Web demo collegato. La postazione puo ricevere eventi in tempo reale.", ...events]);
+      setWhatsappEvents((events) => ["Collegamento WhatsApp demo completato. La postazione puo ricevere eventi in tempo reale.", ...events]);
     }, 1000);
   }
 
@@ -750,7 +757,7 @@ function DemoStudioDentisticoApp() {
     setSelectedAgendaDay(demoAgendaDate);
     setGapStatus("idle");
     setGapLog([]);
-    setWhatsappEvents(["Scenario ripristinato. Puoi simulare una nuova rinuncia dall'agenda o da WhatsApp Web."]);
+    setWhatsappEvents(["Scenario ripristinato. Puoi simulare una nuova rinuncia dall'agenda o dalla sezione messaggi."]);
   }
 
   const filteredPatients = patients.filter((patient) => {
@@ -807,7 +814,7 @@ function DemoStudioDentisticoApp() {
             <div className="mt-1 text-xs text-slate-500">Console demo · simulazione studio dentistico</div>
           </div>
           <div className="flex items-center gap-3">
-            <Badge tone={whatsappHeaderConnected ? "teal" : "slate"}>{whatsappHeaderConnected ? "WhatsApp collegato" : "WhatsApp non collegato"}</Badge>
+            <Badge tone="teal">Sistema demo pronto</Badge>
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white">A</div>
           </div>
         </header>
@@ -837,7 +844,7 @@ function DemoStudioDentisticoApp() {
             />
           )}
           {activeSection === "followup" && (
-            <FollowUpSection active={followupActive} queue={followupQueue} activateFollowup={activateFollowup} />
+            <FollowUpSection active={followupActive} queue={followupQueue} log={followupLog} activateFollowup={activateFollowup} />
           )}
           {activeSection === "pazienti" && (
             <PatientsSection
@@ -861,21 +868,6 @@ function DemoStudioDentisticoApp() {
           )}
           {activeSection === "messaggi" && (
             <MessagesSection conversations={conversations} selected={selectedConversation} setSelected={setSelectedConversation} setActiveSection={setActiveSection} />
-          )}
-          {activeSection === "whatsapp" && (
-            <WhatsAppSection
-              status={whatsappStatus}
-              realWhatsapp={realWhatsapp}
-              patientQr={patientQr}
-              setPatientQr={setPatientQr}
-              events={whatsappEvents}
-              connect={connectWhatsAppDemo}
-              connectReal={connectRealWhatsApp}
-              disconnectReal={disconnectRealWhatsApp}
-              generatePatientQr={generatePatientQr}
-              triggerCancellation={triggerWhatsappCancellation}
-              setActiveSection={setActiveSection}
-            />
           )}
         </div>
       </main>
@@ -1158,7 +1150,7 @@ function FillGapSection({ status, log, slot, simulateCancellation, runCampaign, 
             <h3 className="font-bold text-slate-950">Risposte simulate</h3>
             <div className="mt-4 space-y-3">
               {log.length === 0 ? (
-                <EmptyLine>Avvia la rinuncia o collega WhatsApp Web per generare gli eventi della simulazione.</EmptyLine>
+                <EmptyLine>Avvia una rinuncia dall'agenda per generare gli eventi della simulazione.</EmptyLine>
               ) : (
                 log.map((item, index) => (
                   <div key={`${item}-${index}`} className="rounded-lg border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-600">{item}</div>
@@ -1198,59 +1190,98 @@ function WorkflowState({ label, active, done }) {
   );
 }
 
-function FollowUpSection({ active, queue, activateFollowup }) {
+function FollowUpSection({ active, queue, log, activateFollowup }) {
   return (
     <PageFrame title="Follow-up" subtitle="Qui lo studio vede quali pazienti richiamare e quali automazioni sono pronte per evitare che controlli, igieni e trattamenti consigliati vengano dimenticati.">
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_420px]">
-        <Panel className="overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
-            <div>
-              <h2 className="font-bold text-slate-950">Coda richiami</h2>
-              <p className="mt-1 text-sm text-slate-500">Pazienti ordinati per prossima azione consigliata.</p>
+      <div className="space-y-6">
+        <Panel className="p-6">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="max-w-3xl">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Simulazione follow-up</div>
+              <h2 className="mt-2 text-xl font-bold text-slate-950">Richiamo igiene ogni 6 mesi</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Con un click la demo mostra come il sistema legge le scadenze, mette i pazienti in coda e prepara il messaggio operativo per lo staff.
+              </p>
             </div>
             <Button onClick={activateFollowup} disabled={active}>{active ? "Follow-up igiene attivo" : "Attiva follow-up igiene"}</Button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-6 py-3">Paziente</th>
-                  <th className="px-6 py-3">Motivo richiamo</th>
-                  <th className="px-6 py-3">Quando</th>
-                  <th className="px-6 py-3">Canale</th>
-                  <th className="px-6 py-3">Stato</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {queue.map((item, index) => (
-                  <tr key={`${item.name}-${item.reason}-${index}`} className="bg-white">
-                    <td className="px-6 py-4 font-semibold text-slate-950">{item.name}</td>
-                    <td className="px-6 py-4 text-slate-600">{item.reason}</td>
-                    <td className="px-6 py-4 text-slate-600">{item.due}</td>
-                    <td className="px-6 py-4 text-slate-600">{item.channel}</td>
-                    <td className="px-6 py-4"><Badge tone={item.status === "Da richiamare" ? "amber" : "teal"}>{item.status}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
+            <WorkflowState active={!active} done={active} label="Regola configurata" />
+            <WorkflowState active={active} done={active} label="Scadenze lette" />
+            <WorkflowState active={active} done={active} label="Pazienti in coda" />
+            <WorkflowState active={active} done={active} label="Messaggio pronto" />
+          </div>
+
+          <div className={classNames("mt-6 rounded-lg border p-4 text-sm leading-6", active ? "border-teal-200 bg-teal-50 text-teal-900" : "border-slate-200 bg-slate-50 text-slate-600")}>
+            {active
+              ? "Processo attivo: i pazienti idonei sono entrati nella coda follow-up e lo staff puo inviare o approvare il messaggio preparato."
+              : "Prima dell'attivazione il sistema resta in bozza: puoi mostrare al titolare cosa succede premendo il pulsante di simulazione."}
           </div>
         </Panel>
 
-        <Panel className="p-6">
-          <h2 className="font-bold text-slate-950">Builder automazione</h2>
-          <div className="mt-5 space-y-4">
-            <Field label="Trigger" value="Igiene dentale completata" />
-            <Field label="Attesa" value="5 mesi e 20 giorni" />
-            <Field label="Canale" value="WhatsApp se consenso attivo, altrimenti email operativa" />
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Messaggio</label>
-              <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                Ciao Sara, sono passati circa 6 mesi dalla tua ultima igiene dentale. Ti consigliamo di prenotare un controllo per mantenere denti e gengive in salute. Vuoi che ti proponiamo qualche disponibilita?
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_420px]">
+          <Panel className="overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
+              <div>
+                <h2 className="font-bold text-slate-950">Coda richiami</h2>
+                <p className="mt-1 text-sm text-slate-500">Pazienti ordinati per prossima azione consigliata.</p>
               </div>
+              <Badge tone={active ? "teal" : "slate"}>{active ? "Coda aggiornata" : "In attesa di attivazione"}</Badge>
             </div>
-            <Badge tone={active ? "teal" : "slate"}>{active ? "Automazione attiva" : "Automazione in bozza"}</Badge>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-6 py-3">Paziente</th>
+                    <th className="px-6 py-3">Motivo richiamo</th>
+                    <th className="px-6 py-3">Quando</th>
+                    <th className="px-6 py-3">Canale</th>
+                    <th className="px-6 py-3">Stato</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {queue.map((item, index) => (
+                    <tr key={`${item.name}-${item.reason}-${index}`} className={active && index < 2 ? "bg-teal-50/50" : "bg-white"}>
+                      <td className="px-6 py-4 font-semibold text-slate-950">{item.name}</td>
+                      <td className="px-6 py-4 text-slate-600">{item.reason}</td>
+                      <td className="px-6 py-4 text-slate-600">{item.due}</td>
+                      <td className="px-6 py-4 text-slate-600">{item.channel}</td>
+                      <td className="px-6 py-4"><Badge tone={item.status === "Da richiamare" ? "amber" : item.status === "In programma" ? "slate" : "teal"}>{item.status}</Badge></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
+
+          <div className="space-y-6">
+            <Panel className="p-6">
+              <h2 className="font-bold text-slate-950">Builder automazione</h2>
+              <div className="mt-5 space-y-4">
+                <Field label="Trigger" value="Igiene dentale completata" />
+                <Field label="Attesa" value="5 mesi e 20 giorni" />
+                <Field label="Canale" value="WhatsApp se consenso attivo, altrimenti email operativa" />
+                <div>
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Messaggio</label>
+                  <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                    Ciao Sara, sono passati circa 6 mesi dalla tua ultima igiene dentale. Ti consigliamo di prenotare un controllo per mantenere denti e gengive in salute. Vuoi che ti proponiamo qualche disponibilita?
+                  </div>
+                </div>
+                <Badge tone={active ? "teal" : "slate"}>{active ? "Automazione attiva" : "Automazione in bozza"}</Badge>
+              </div>
+            </Panel>
+
+            <Panel className="p-6">
+              <h2 className="font-bold text-slate-950">Registro processo</h2>
+              <div className="mt-4 space-y-3">
+                {log.map((item, index) => (
+                  <div key={`${item}-${index}`} className="rounded-lg border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-600">{item}</div>
+                ))}
+              </div>
+            </Panel>
           </div>
-        </Panel>
+        </div>
       </div>
     </PageFrame>
   );
@@ -1566,7 +1597,7 @@ function WhatsAppSection({
   }[realWhatsapp.status] || realWhatsapp.status;
 
   return (
-    <PageFrame title="WhatsApp Web" subtitle="Collegamento demo per mostrare al titolare cosa succede quando un paziente rinuncia via WhatsApp e il sistema prepara automaticamente il Fill the Gap.">
+    <PageFrame title="Bridge WhatsApp locale" subtitle="Collegamento demo per mostrare al titolare cosa succede quando un paziente rinuncia via WhatsApp e il sistema prepara automaticamente il Fill the Gap.">
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[430px_1fr]">
         <Panel className="p-6">
           <div className="flex items-start justify-between gap-4">
