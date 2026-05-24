@@ -390,7 +390,7 @@ function Button({ children, onClick, variant = "primary", disabled = false, clas
 
 function PageFrame({ title, subtitle, children }) {
   return (
-    <div className="mx-auto min-h-[1180px] w-full max-w-[1500px] px-7 py-8 lg:px-9">
+    <div className="min-h-full w-full px-7 py-8 lg:px-9">
       <div className="mb-7">
         <h1 className="text-2xl font-bold tracking-normal text-slate-950">{title}</h1>
         {subtitle && <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">{subtitle}</p>}
@@ -798,13 +798,6 @@ function DemoStudioDentisticoApp() {
             ))}
           </div>
         </nav>
-
-        <div className="flex-shrink-0 border-t border-slate-100 p-4">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-600">
-            <div className="mb-1 font-semibold text-slate-800">Demo operativa</div>
-            Comunicazioni inviate solo a pazienti con consenso attivo. Il sistema supporta lo staff e non sostituisce il medico.
-          </div>
-        </div>
       </aside>
 
       <main className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden">
@@ -819,7 +812,7 @@ function DemoStudioDentisticoApp() {
           </div>
         </header>
 
-        <div data-app-scroll className="min-w-0 flex-1 overflow-y-auto">
+        <div data-app-scroll className="min-w-0 flex-1 overflow-y-scroll">
           {activeSection === "agenda" && (
             <AgendaSectionMonthly
               monthDays={monthDays}
