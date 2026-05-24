@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const sections = [
   { id: "guidata", label: "Demo guidata", emoji: "🎬", preview: "Scenari pronti per mostrare Fill the Gap, follow-up e preventivi." },
@@ -33,6 +33,41 @@ const guidedScenarios = [
     section: "Preventivi",
     preview: "Avvia la sequenza automatica su un preventivo inviato da giorni.",
     action: "Avvia sequenza",
+  },
+];
+
+const fillGapSteps = [
+  {
+    title: "Rinuncia rilevata",
+    detail: "Il paziente annulla l'appuntamento delle 16:00.",
+  },
+  {
+    title: "Slot libero creato",
+    detail: "L'agenda evidenzia lo spazio da riempire.",
+  },
+  {
+    title: "Ricerca pazienti compatibili",
+    detail: "Il sistema controlla lista d'attesa, preferenze, prossimita e consenso.",
+  },
+  {
+    title: "Classifica suggerimenti",
+    detail: "I pazienti vengono ordinati per probabilita e coerenza con lo slot.",
+  },
+  {
+    title: "Messaggi automatici",
+    detail: "WhatsApp, SMS o email partono sul canale preferito.",
+  },
+  {
+    title: "Risposta ricevuta",
+    detail: "Il primo paziente disponibile conferma lo slot.",
+  },
+  {
+    title: "Agenda aggiornata",
+    detail: "Lo slot viene assegnato automaticamente.",
+  },
+  {
+    title: "Esito finale",
+    detail: "Lo staff vede lo slot recuperato senza chiamate manuali.",
   },
 ];
 
@@ -573,6 +608,8 @@ function DemoStudioDentisticoApp() {
   const [slots, setSlots] = useState(initialSlots);
   const [selectedAgendaDay, setSelectedAgendaDay] = useState(demoAgendaDate);
   const [gapStatus, setGapStatus] = useState("idle");
+  const [gapStep, setGapStep] = useState(0);
+  const [gapSimulationRunning, setGapSimulationRunning] = useState(false);
   const [gapLog, setGapLog] = useState([]);
   const [followupActive, setFollowupActive] = useState(false);
   const [followupQueue, setFollowupQueue] = useState(baseFollowUps);
@@ -614,6 +651,8 @@ function DemoStudioDentisticoApp() {
   const [whatsappEvents, setWhatsappEvents] = useState([
     "Sistema pronto per ricevere messaggi operativi dai pazienti collegati alla demo.",
   ]);
+  const gapTimersRef = useRef([]);
+  const gapRunRef = useRef(0);
 
   const activeLabel = sections.find((section) => section.id === activeSection)?.label || "Home";
   const targetSlot = slots.find((slot) => slot.time === "16:00");
@@ -627,6 +666,29 @@ function DemoStudioDentisticoApp() {
     const scrollArea = document.querySelector("[data-app-scroll]");
     if (scrollArea) scrollArea.scrollTop = 0;
   }, [activeSection]);
+
+  useEffect(() => {
+    return () => clearGapTimers();
+  }, []);
+
+  function clearGapTimers() {
+    gapTimersRef.current.forEach((timer) => clearTimeout(timer));
+    gapTimersRef.current = [];
+    gapRunRef.current += 1;
+  }
+
+  function beginGapRun() {
+    clearGapTimers();
+    gapRunRef.current += 1;
+    return gapRunRef.current;
+  }
+
+  function scheduleGapStep(runId, delay, action) {
+    const timer = setTimeout(() => {
+      if (gapRunRef.current === runId) action();
+    }, delay);
+    gapTimersRef.current.push(timer);
+  }
 
   useEffect(() => {
     const current = conversations.find((conversation) => conversation.id === selectedConversation?.id);
@@ -691,6 +753,7 @@ function DemoStudioDentisticoApp() {
   }, []);
 
   function markSlotAsOpen(source = "manual") {
+    clearGapTimers();
     setSlots((current) =>
       current.map((slot) =>
         slot.time === "16:00"
@@ -699,6 +762,8 @@ function DemoStudioDentisticoApp() {
       )
     );
     setGapStatus("detected");
+    setGapStep(2);
+    setGapSimulationRunning(false);
     setGapLog([
       "Il sistema ha rilevato una rinuncia per lunedi 25 maggio alle 16:00.",
       "Sistema in ricerca di pazienti compatibili con consenso attivo.",
@@ -748,6 +813,60 @@ function DemoStudioDentisticoApp() {
     setNotifications((current) => [notification, ...current.filter((item) => item.title !== notification.title)].slice(0, 6));
   }
 
+  function openDemoSlot() {
+    setSlots((current) =>
+      current.map((slot) =>
+        slot.time === "16:00"
+          ? { ...slot, patient: "Slot da riempire", treatment: "Igiene dentale", status: "da riempire", channel: "WhatsApp" }
+          : slot
+      )
+    );
+    setGapStatus("detected");
+  }
+
+  function recordCancellationConversation(studioText = "Grazie per averci avvisato. Ti proponiamo nuove disponibilita appena possibile.") {
+    addOrUpdateConversation({
+      id: "giulia-rinuncia",
+      name: "Giulia Ferri",
+      channel: "WhatsApp",
+      status: "Rinuncia ricevuta",
+      preview: "Devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00.",
+      messages: [
+        { from: "Giulia", text: "Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace." },
+        { from: "Studio", text: studioText },
+      ],
+    });
+  }
+
+  function completeFillGapAssignment() {
+    setSlots((current) =>
+      current.map((slot) =>
+        slot.time === "16:00"
+          ? { ...slot, patient: "Maria Rossi", treatment: "Igiene dentale", status: "riempito", channel: "WhatsApp" }
+          : slot
+      )
+    );
+    setGapStatus("filled");
+    pushNotification({
+      title: "Slot recuperato",
+      detail: "Maria Rossi ha confermato lo slot igiene del 25 maggio alle 16:00.",
+      target: "agenda",
+      tone: "teal",
+    });
+    addOrUpdateConversation({
+      id: "maria",
+      name: "Maria Rossi",
+      channel: "WhatsApp",
+      status: "Risposto",
+      preview: "Si, confermo per lunedi 25 maggio alle 16:00.",
+      messages: [
+        { from: "Studio", text: "Ciao Maria, si e appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale presso Demo Studio Dentistico. Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te." },
+        { from: "Maria", text: "Si, confermo per lunedi 25 maggio alle 16:00." },
+        { from: "Studio", text: "Perfetto, appuntamento confermato. A lunedi." },
+      ],
+    });
+  }
+
   function patchQuote(targetQuote, patch, timelineLines = []) {
     const applyPatch = (quote) => ({ ...quote, ...patch, timeline: [...timelineLines, ...quote.timeline] });
     setQuoteRecords((current) =>
@@ -764,52 +883,87 @@ function DemoStudioDentisticoApp() {
     );
   }
 
-  function runFillGapCampaign(mode = "manual", force = false) {
+  function runFillGapCampaign(mode = "manual", force = false, startFromScratch = false) {
     if (!force && gapStatus === "filled") return;
-    setGapStatus("sending");
-    setGapLog([
-      mode === "auto" ? "Automazione Fill the Gap avviata dopo rinuncia WhatsApp reale." : "Campagna Fill the Gap avviata dallo staff.",
-      "Messaggi preparati solo per pazienti con consenso attivo.",
-      "Il paziente compatibile viene contattato sul canale preferito.",
-    ]);
+    const runId = beginGapRun();
+    const alreadyDetected = !startFromScratch && (mode === "auto" || gapStatus !== "idle" || targetSlot?.status === "da riempire");
+    setGuidedScenario("rinuncia");
+    setSelectedAgendaDay(demoAgendaDate);
+    setGapSimulationRunning(true);
 
-    setTimeout(() => {
+    if (!alreadyDetected) {
+      if (startFromScratch) setSlots(initialSlots);
+      setGapStep(1);
+      setGapStatus("idle");
+      setGapLog(["Rinuncia rilevata: Giulia Ferri annulla l'appuntamento di lunedi 25 maggio alle 16:00."]);
+      recordCancellationConversation("Grazie per averci avvisato. Stiamo riorganizzando lo slot.");
+      scheduleGapStep(runId, 650, () => {
+        openDemoSlot();
+        setGapStep(2);
+        setGapLog((current) => ["Slot libero creato in agenda: igiene dentale delle 16:00 da riempire.", ...current]);
+        pushNotification({
+          title: "Slot da riempire rilevato",
+          detail: "Il sistema ha aperto il flusso Fill the Gap sullo slot igiene delle 16:00.",
+          target: "fillgap",
+          tone: "amber",
+        });
+      });
+    } else {
+      setGapStep(Math.max(gapStep, 2));
+      setGapLog((current) => current.length ? current : ["Slot libero gia rilevato: il sistema puo avviare la ricerca dei pazienti compatibili."]);
+    }
+
+    const offset = alreadyDetected ? 0 : 650;
+    scheduleGapStep(runId, offset + 750, () => {
+      setGapStep(3);
+      setGapLog((current) => [
+        "Ricerca pazienti compatibili: lista d'attesa, igiene scaduta, preferenza pomeriggio, distanza e consenso.",
+        ...current,
+      ]);
+    });
+    scheduleGapStep(runId, offset + 1500, () => {
+      setGapStep(4);
+      setGapLog((current) => [
+        "Classifica pronta: Maria Rossi risulta la migliore candidata per trattamento, fascia oraria e consenso.",
+        ...current,
+      ]);
+    });
+    scheduleGapStep(runId, offset + 2250, () => {
+      setGapStep(5);
+      setGapStatus("sending");
+      setGapLog((current) => [
+        mode === "auto" ? "Messaggi automatici inviati dopo la rinuncia WhatsApp." : "Messaggi automatici inviati ai pazienti compatibili.",
+        "Maria Rossi: WhatsApp inviato. Luca Bianchi: SMS inviato. Antonio Greco: email inviata.",
+        ...current,
+      ]);
+    });
+    scheduleGapStep(runId, offset + 3150, () => {
+      setGapStep(6);
       setGapLog((current) => [
         "Maria Rossi ha risposto: Si, confermo per lunedi 25 maggio alle 16:00.",
         "Luca Bianchi ha risposto: posso solo dopo le 17:00.",
         ...current,
       ]);
-    }, 700);
+    });
+    scheduleGapStep(runId, offset + 4050, () => {
+      setGapStep(7);
+      completeFillGapAssignment();
+      setGapLog((current) => ["Agenda aggiornata: lo slot delle 16:00 e stato assegnato a Maria Rossi.", ...current]);
+    });
+    scheduleGapStep(runId, offset + 4950, () => {
+      setGapStep(8);
+      setGapSimulationRunning(false);
+      setGapLog((current) => [
+        "Esito finale: slot recuperato senza chiamate manuali della segreteria.",
+        "La segreteria vede il risultato gia registrato in agenda e nei messaggi.",
+        ...current,
+      ]);
+    });
+  }
 
-    setTimeout(() => {
-      setSlots((current) =>
-        current.map((slot) =>
-          slot.time === "16:00"
-            ? { ...slot, patient: "Maria Rossi", treatment: "Igiene dentale", status: "riempito", channel: "WhatsApp" }
-            : slot
-        )
-      );
-      setGapStatus("filled");
-      setGapLog((current) => ["Slot assegnato automaticamente a Maria Rossi.", "Conferma registrata in agenda.", ...current]);
-      pushNotification({
-        title: "Slot recuperato",
-        detail: "Maria Rossi ha confermato lo slot igiene del 25 maggio alle 16:00.",
-        target: "agenda",
-        tone: "teal",
-      });
-      addOrUpdateConversation({
-        id: "maria",
-        name: "Maria Rossi",
-        channel: "WhatsApp",
-        status: "Risposto",
-        preview: "Si, confermo per lunedi 25 maggio alle 16:00.",
-        messages: [
-          { from: "Studio", text: "Ciao Maria, si e appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale presso Demo Studio Dentistico. Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te." },
-          { from: "Maria", text: "Si, confermo per lunedi 25 maggio alle 16:00." },
-          { from: "Studio", text: "Perfetto, appuntamento confermato. A lunedi." },
-        ],
-      });
-    }, 1500);
+  function runFillGapGuidedSimulation() {
+    setActiveSection("fillgap");
+    runFillGapCampaign("manual", true, true);
   }
 
   function activateFollowup() {
@@ -911,9 +1065,7 @@ function DemoStudioDentisticoApp() {
   function startGuidedScenario(scenarioId) {
     setGuidedScenario(scenarioId);
     if (scenarioId === "rinuncia") {
-      resetScenario();
-      simulateCancellation();
-      setTimeout(() => runFillGapCampaign("auto", true), 900);
+      runFillGapGuidedSimulation();
       return;
     }
     if (scenarioId === "inattivo") {
@@ -1075,9 +1227,12 @@ function DemoStudioDentisticoApp() {
   }
 
   function resetScenario() {
+    clearGapTimers();
     setSlots(initialSlots);
     setSelectedAgendaDay(demoAgendaDate);
     setGapStatus("idle");
+    setGapStep(0);
+    setGapSimulationRunning(false);
     setGapLog([]);
     setWhatsappEvents(["Scenario ripristinato. Puoi simulare una nuova rinuncia dall'agenda o dalla sezione messaggi."]);
   }
@@ -1205,10 +1360,13 @@ function DemoStudioDentisticoApp() {
           {activeSection === "fillgap" && (
             <FillGapSection
               status={gapStatus}
+              step={gapStep}
+              isSimulationRunning={gapSimulationRunning}
               log={gapLog}
               slot={targetSlot}
               simulateCancellation={simulateCancellation}
               runCampaign={runFillGapCampaign}
+              runGuidedSimulation={runFillGapGuidedSimulation}
               setActiveSection={setActiveSection}
             />
           )}
@@ -1454,12 +1612,105 @@ function StepLine({ step, text }) {
   );
 }
 
-function FillGapSection({ status, log, slot, simulateCancellation, runCampaign, setActiveSection }) {
+function FillGapStepTimeline({ step }) {
+  return (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {fillGapSteps.map((item, index) => {
+        const itemStep = index + 1;
+        const done = step > itemStep || (step >= fillGapSteps.length && itemStep === fillGapSteps.length);
+        const active = step === itemStep && !done;
+        return (
+          <div
+            key={item.title}
+            className={classNames(
+              "rounded-lg border p-4 transition",
+              done ? "border-teal-200 bg-teal-50" : active ? "border-slate-300 bg-white shadow-sm" : "border-slate-200 bg-slate-50"
+            )}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className={classNames("flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold", done ? "bg-teal-700 text-white" : active ? "bg-slate-900 text-white" : "bg-white text-slate-400 border border-slate-200")}>
+                {itemStep}
+              </span>
+              <span className={classNames("text-xs font-semibold uppercase tracking-wide", done ? "text-teal-700" : active ? "text-slate-700" : "text-slate-400")}>
+                {done ? "Completato" : active ? "In corso" : "In attesa"}
+              </span>
+            </div>
+            <div className="mt-3 text-sm font-bold text-slate-950">{item.title}</div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">{item.detail}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function FillGapMessageStates({ step }) {
+  const states = [
+    { name: "Maria Rossi", channel: "WhatsApp", status: step >= 6 ? "Risposto" : step >= 5 ? "Letto" : "In attesa" },
+    { name: "Luca Bianchi", channel: "SMS", status: step >= 6 ? "Risposto piu tardi" : step >= 5 ? "Consegnato" : "In attesa" },
+    { name: "Antonio Greco", channel: "Email", status: step >= 5 ? "Inviato" : "In attesa" },
+  ];
+
+  return (
+    <div className="mt-4 space-y-2">
+      {states.map((item) => (
+        <div key={item.name} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
+          <div>
+            <div className="font-semibold text-slate-900">{item.name}</div>
+            <div className="text-xs text-slate-500">{item.channel}</div>
+          </div>
+          <Badge tone={item.status === "Risposto" ? "teal" : item.status === "In attesa" ? "slate" : "amber"}>{item.status}</Badge>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FillGapSection({ status, step, isSimulationRunning, log, slot, simulateCancellation, runCampaign, runGuidedSimulation, setActiveSection }) {
   const hasDetectedSlot = status !== "idle" || slot?.status === "da riempire" || slot?.status === "riempito";
+  const currentStep = Math.max(step || 0, status === "filled" ? 8 : status === "sending" ? 5 : hasDetectedSlot ? 2 : 0);
+  const currentStepInfo = currentStep > 0 ? fillGapSteps[currentStep - 1] : null;
   return (
     <PageFrame title="Fill the Gap" subtitle="Simula il recupero operativo di uno slot lasciato libero: il sistema rileva la rinuncia, seleziona pazienti compatibili e aggiorna l'agenda quando arriva una conferma.">
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_420px]">
         <div className="space-y-6">
+          <Panel className="p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Simulazione guidata</div>
+                <h2 className="mt-2 text-xl font-bold text-slate-950">Avvia il Fill the Gap passo per passo</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                  La demo mostra ogni passaggio: rinuncia, slot libero, ricerca, classifica, messaggi, risposta e agenda aggiornata.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button onClick={runGuidedSimulation} disabled={isSimulationRunning}>
+                  {isSimulationRunning ? "Simulazione in corso" : status === "filled" ? "Riavvia simulazione Fill the Gap" : "Avvia simulazione Fill the Gap"}
+                </Button>
+                {!hasDetectedSlot && !isSimulationRunning && (
+                  <Button onClick={simulateCancellation} variant="secondary">Simula solo rinuncia</Button>
+                )}
+                {hasDetectedSlot && status !== "filled" && !isSimulationRunning && (
+                  <Button onClick={() => runCampaign("manual", true)} variant="secondary">Prosegui dagli step automatici</Button>
+                )}
+              </div>
+            </div>
+
+            <div className={classNames("mt-6 rounded-lg border p-4", currentStep ? "border-teal-200 bg-teal-50" : "border-slate-200 bg-slate-50")}>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Passaggio attuale</div>
+              <div className="mt-2 text-lg font-bold text-slate-950">
+                {currentStepInfo ? `${currentStep}/8 - ${currentStepInfo.title}` : "Pronto per la simulazione"}
+              </div>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                {currentStepInfo ? currentStepInfo.detail : "Premi Avvia simulazione Fill the Gap per vedere l'automazione completa dall'inizio alla fine."}
+              </p>
+            </div>
+
+            <div className="mt-5">
+              <FillGapStepTimeline step={currentStep} />
+            </div>
+          </Panel>
+
           <Panel className="p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -1469,20 +1720,7 @@ function FillGapSection({ status, log, slot, simulateCancellation, runCampaign, 
                   Stato attuale: <span className={classNames("ml-1 inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold", statusStyle(slot?.status))}>{slot?.status}</span>
                 </p>
               </div>
-              {!hasDetectedSlot ? (
-                <Button onClick={simulateCancellation}>Simula rinuncia</Button>
-              ) : (
-                <Button onClick={runCampaign} disabled={status === "sending" || status === "filled"}>
-                  {status === "filled" ? "Slot gia riempito" : status === "sending" ? "Invio in corso" : "Avvia Fill the Gap"}
-                </Button>
-              )}
-            </div>
-
-            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-4">
-              <WorkflowState active={hasDetectedSlot} done={hasDetectedSlot} label="Rinuncia rilevata" />
-              <WorkflowState active={status === "detected" || status === "sending" || status === "filled"} done={status === "sending" || status === "filled"} label="Pazienti selezionati" />
-              <WorkflowState active={status === "sending" || status === "filled"} done={status === "filled"} label="Messaggi inviati" />
-              <WorkflowState active={status === "filled"} done={status === "filled"} label="Agenda aggiornata" />
+              <Badge tone={status === "filled" ? "teal" : hasDetectedSlot ? "amber" : "slate"}>{status === "filled" ? "Riempito" : hasDetectedSlot ? "Da riempire" : "Confermato"}</Badge>
             </div>
           </Panel>
 
@@ -1496,7 +1734,15 @@ function FillGapSection({ status, log, slot, simulateCancellation, runCampaign, 
             </div>
             <div className="mt-5 space-y-3">
               {candidateList.map((candidate) => (
-                <div key={candidate.name} className={classNames("rounded-lg border p-4", candidate.consent ? "border-slate-200 bg-white" : "border-slate-200 bg-slate-50 opacity-70")}>
+                <div
+                  key={candidate.name}
+                  className={classNames(
+                    "rounded-lg border p-4 transition",
+                    candidate.consent ? "border-slate-200 bg-white" : "border-slate-200 bg-slate-50 opacity-70",
+                    currentStep < 3 && "opacity-50",
+                    currentStep >= 4 && candidate.name === "Maria Rossi" && "border-teal-300 bg-teal-50"
+                  )}
+                >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="font-semibold text-slate-950">{candidate.name}</div>
@@ -1521,6 +1767,7 @@ function FillGapSection({ status, log, slot, simulateCancellation, runCampaign, 
             <p className="mt-3 text-xs leading-5 text-slate-500">
               Invio solo a pazienti con consenso comunicazioni attivo. Ogni messaggio puo includere indicazioni per non ricevere ulteriori comunicazioni non necessarie.
             </p>
+            <FillGapMessageStates step={currentStep} />
           </Panel>
         </div>
 
@@ -1540,13 +1787,13 @@ function FillGapSection({ status, log, slot, simulateCancellation, runCampaign, 
 
           <Panel className="p-6">
             <h3 className="font-bold text-slate-950">Esito operativo</h3>
-            {status === "filled" ? (
+            {status === "filled" && currentStep >= 8 ? (
               <div className="mt-4 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm leading-6 text-teal-800">
                 Maria Rossi ha confermato. Lo slot di lunedi 25 maggio alle 16:00 risulta aggiornato in agenda e la segreteria puo proseguire senza chiamate manuali.
               </div>
             ) : (
               <div className="mt-4 text-sm leading-6 text-slate-600">
-                La demo mostra come lo staff passa da una rinuncia a una proposta automatizzata, mantenendo controllo e consenso.
+                La demo mostra come il sistema passa da una rinuncia a uno slot aggiornato, mantenendo consenso, canali e tracciamento dei messaggi.
               </div>
             )}
             <div className="mt-5 grid grid-cols-1 gap-3">
