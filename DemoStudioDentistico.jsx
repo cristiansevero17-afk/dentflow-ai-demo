@@ -11,6 +11,36 @@ const sections = [
   { id: "messaggi", label: "Messaggi", mark: "MS", emoji: "💬", preview: "Inbox simulata per WhatsApp, SMS ed email." },
 ];
 
+const guidedScenarios = [
+  {
+    id: "rinuncia",
+    title: "Rinuncia appuntamento",
+    section: "Fill the Gap",
+    preview: "Mostra come una disdetta alle 16:00 diventa uno slot recuperato.",
+    action: "Avvia scenario",
+  },
+  {
+    id: "inattivo",
+    title: "Paziente non torna",
+    section: "Follow-up",
+    preview: "Attiva un richiamo automatico per pazienti vicini alla scadenza.",
+    action: "Attiva richiamo",
+  },
+  {
+    id: "preventivo",
+    title: "Preventivo fermo",
+    section: "Preventivi",
+    preview: "Avvia la sequenza automatica su un preventivo inviato da giorni.",
+    action: "Avvia sequenza",
+  },
+];
+
+const initialNotifications = [
+  { title: "Rinuncia possibile da gestire", detail: "Slot igiene del 25 maggio alle 16:00 pronto per simulare il Fill the Gap.", target: "agenda", tone: "amber" },
+  { title: "Richiami igiene in scadenza", detail: "Sara Colombo e altri pazienti possono entrare nel follow-up automatico.", target: "followup", tone: "teal" },
+  { title: "Preventivo da seguire", detail: "Elena Conti ha un preventivo aperto e puo ricevere una sequenza automatica.", target: "preventivi", tone: "slate" },
+];
+
 const whatsappLocalServerUrl = "http://localhost:8787";
 
 const initialSlots = [
@@ -250,10 +280,10 @@ const patients = [
 ];
 
 const baseFollowUps = [
-  { name: "Sara Colombo", reason: "Igiene dentale ogni 6 mesi", due: "Questa settimana", channel: "WhatsApp", status: "Pronto" },
-  { name: "Marco Riva", reason: "Controllo post-intervento", due: "Lunedi 25 maggio", channel: "SMS", status: "In programma" },
-  { name: "Elena Conti", reason: "Preventivo non confermato", due: "Oggi", channel: "Telefonata", status: "Da richiamare" },
-  { name: "Andrea Moretti", reason: "Paziente inattivo", due: "Questa settimana", channel: "WhatsApp", status: "Pronto" },
+  { name: "Sara Colombo", reason: "Igiene dentale ogni 6 mesi", due: "Questa settimana", channel: "WhatsApp", status: "Programmato" },
+  { name: "Marco Riva", reason: "Controllo post-intervento", due: "Lunedi 25 maggio", channel: "SMS", status: "Programmato" },
+  { name: "Elena Conti", reason: "Preventivo non confermato", due: "Oggi", channel: "Telefonata", status: "Chiamata consigliata" },
+  { name: "Andrea Moretti", reason: "Paziente inattivo", due: "Questa settimana", channel: "WhatsApp", status: "Programmato" },
 ];
 
 const waitlist = [
@@ -404,7 +434,53 @@ function EmptyLine({ children }) {
   return <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">{children}</div>;
 }
 
-function HomeScreen({ sections, setActiveSection }) {
+function ScenarioTimeline({ steps }) {
+  return (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+      {steps.map((step) => (
+        <div key={step.label} className={classNames("rounded-lg border p-4", step.done ? "border-teal-200 bg-teal-50" : step.active ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white")}>
+          <div className={classNames("mb-3 h-2 w-10 rounded-full", step.done ? "bg-teal-600" : step.active ? "bg-amber-500" : "bg-slate-200")} />
+          <div className="text-sm font-semibold text-slate-900">{step.label}</div>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{step.detail}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function NotificationCenter({ notifications, setActiveSection }) {
+  return (
+    <Panel className="p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-bold text-slate-950">Eventi rilevati oggi</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">Punti operativi pronti per una simulazione live.</p>
+        </div>
+        <Badge tone="teal">{notifications.length} eventi</Badge>
+      </div>
+      <div className="mt-4 space-y-3">
+        {notifications.map((notification, index) => (
+          <button
+            key={`${notification.title}-${index}`}
+            type="button"
+            onClick={() => setActiveSection(notification.target)}
+            className="block w-full rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:border-teal-200 hover:bg-teal-50/40"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-950">{notification.title}</div>
+                <div className="mt-1 text-xs leading-5 text-slate-500">{notification.detail}</div>
+              </div>
+              <Badge tone={notification.tone}>{notification.target}</Badge>
+            </div>
+          </button>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
+function HomeScreen({ sections, notifications, timelineSteps, startGuidedScenario, runDaySimulation, setActiveSection }) {
   return (
     <div className="min-h-screen w-screen overflow-y-auto bg-slate-50 font-sans text-slate-900">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-8 lg:px-10">
@@ -419,13 +495,45 @@ function HomeScreen({ sections, setActiveSection }) {
           <Badge tone="teal">Sistema demo pronto</Badge>
         </header>
 
-        <main className="flex flex-1 flex-col justify-center py-10">
+        <main className="py-10">
           <div className="max-w-3xl">
             <div className="text-xs font-semibold uppercase tracking-wide text-teal-700">Console operativa</div>
             <h1 className="mt-3 text-4xl font-bold tracking-normal text-slate-950">Scegli una sezione della demo</h1>
             <p className="mt-4 text-base leading-7 text-slate-600">
               Ogni area mostra una parte del flusso operativo dello studio: agenda, recupero slot, follow-up automatici, CRM e messaggi.
             </p>
+          </div>
+
+          <div className="mt-9 grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
+            <Panel className="p-5">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 className="font-bold text-slate-950">Demo guidata</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">Tre scenari pronti da mostrare al titolare dello studio.</p>
+                </div>
+                <Button onClick={runDaySimulation} variant="secondary">Simula giornata di studio</Button>
+              </div>
+              <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-3">
+                {guidedScenarios.map((scenario) => (
+                  <button
+                    key={scenario.id}
+                    type="button"
+                    onClick={() => startGuidedScenario(scenario.id)}
+                    className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-teal-200 hover:bg-white hover:shadow-sm"
+                  >
+                    <div className="text-xs font-semibold uppercase tracking-wide text-teal-700">{scenario.section}</div>
+                    <div className="mt-2 font-bold text-slate-950">{scenario.title}</div>
+                    <p className="mt-2 min-h-[48px] text-sm leading-6 text-slate-500">{scenario.preview}</p>
+                    <div className="mt-3 text-sm font-semibold text-teal-700">{scenario.action}</div>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-6">
+                <ScenarioTimeline steps={timelineSteps} />
+              </div>
+            </Panel>
+
+            <NotificationCenter notifications={notifications} setActiveSection={setActiveSection} />
           </div>
 
           <div className="mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -468,11 +576,18 @@ function DemoStudioDentisticoApp() {
   const [patientFilter, setPatientFilter] = useState("Tutti");
   const [patientSearch, setPatientSearch] = useState("");
   const [waitFilter, setWaitFilter] = useState("Tutti");
+  const [quoteRecords, setQuoteRecords] = useState(quotes);
   const [selectedQuote, setSelectedQuote] = useState(quotes[0]);
   const [quoteFilter, setQuoteFilter] = useState("Tutti");
+  const [quoteAutomationStatus, setQuoteAutomationStatus] = useState("idle");
+  const [quoteAutomationLog, setQuoteAutomationLog] = useState([
+    "Seleziona un preventivo o avvia lo scenario guidato per vedere la sequenza automatica.",
+  ]);
   const [automations, setAutomations] = useState(initialAutomations);
   const [conversations, setConversations] = useState(initialConversations);
   const [selectedConversation, setSelectedConversation] = useState(initialConversations[0]);
+  const [notifications, setNotifications] = useState(initialNotifications);
+  const [guidedScenario, setGuidedScenario] = useState("idle");
   const [whatsappStatus, setWhatsappStatus] = useState("not_connected");
   const [realWhatsapp, setRealWhatsapp] = useState({
     available: false,
@@ -577,9 +692,15 @@ function DemoStudioDentisticoApp() {
     );
     setGapStatus("detected");
     setGapLog([
-      "Rinuncia ricevuta per lo slot di lunedi 25 maggio alle 16:00.",
+      "Il sistema ha rilevato una rinuncia per lunedi 25 maggio alle 16:00.",
       "Sistema in ricerca di pazienti compatibili con consenso attivo.",
     ]);
+    pushNotification({
+      title: "Slot da riempire rilevato",
+      detail: "Il sistema ha aperto il flusso Fill the Gap sullo slot igiene delle 16:00.",
+      target: "fillgap",
+      tone: "amber",
+    });
     if (source === "whatsapp") {
       setWhatsappEvents((events) => [
         "Messaggio ricevuto da Giulia Ferri: devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00.",
@@ -590,6 +711,7 @@ function DemoStudioDentisticoApp() {
   }
 
   function simulateCancellation() {
+    setGuidedScenario("rinuncia");
     setSelectedAgendaDay(demoAgendaDate);
     markSlotAsOpen("manual");
     addOrUpdateConversation({
@@ -614,13 +736,33 @@ function DemoStudioDentisticoApp() {
     });
   }
 
+  function pushNotification(notification) {
+    setNotifications((current) => [notification, ...current.filter((item) => item.title !== notification.title)].slice(0, 6));
+  }
+
+  function patchQuote(targetQuote, patch, timelineLines = []) {
+    const applyPatch = (quote) => ({ ...quote, ...patch, timeline: [...timelineLines, ...quote.timeline] });
+    setQuoteRecords((current) =>
+      current.map((quote) =>
+        quote.name === targetQuote.name && quote.treatment === targetQuote.treatment
+          ? applyPatch(quote)
+          : quote
+      )
+    );
+    setSelectedQuote((current) =>
+      current?.name === targetQuote.name && current?.treatment === targetQuote.treatment
+        ? applyPatch(current)
+        : applyPatch(targetQuote)
+    );
+  }
+
   function runFillGapCampaign(mode = "manual", force = false) {
     if (!force && gapStatus === "filled") return;
     setGapStatus("sending");
     setGapLog([
       mode === "auto" ? "Automazione Fill the Gap avviata dopo rinuncia WhatsApp reale." : "Campagna Fill the Gap avviata dallo staff.",
       "Messaggi preparati solo per pazienti con consenso attivo.",
-      "Invio in corso su WhatsApp e SMS secondo preferenza del paziente.",
+      "Il paziente compatibile viene contattato sul canale preferito.",
     ]);
 
     setTimeout(() => {
@@ -641,6 +783,12 @@ function DemoStudioDentisticoApp() {
       );
       setGapStatus("filled");
       setGapLog((current) => ["Slot assegnato automaticamente a Maria Rossi.", "Conferma registrata in agenda.", ...current]);
+      pushNotification({
+        title: "Slot recuperato",
+        detail: "Maria Rossi ha confermato lo slot igiene del 25 maggio alle 16:00.",
+        target: "agenda",
+        tone: "teal",
+      });
       addOrUpdateConversation({
         id: "maria",
         name: "Maria Rossi",
@@ -657,6 +805,7 @@ function DemoStudioDentisticoApp() {
   }
 
   function activateFollowup() {
+    setGuidedScenario("inattivo");
     setFollowupActive(true);
     setFollowupLog([
       "Automazione richiamo igiene attivata.",
@@ -674,11 +823,127 @@ function DemoStudioDentisticoApp() {
     setFollowupQueue((current) => {
       if (current.some((item) => item.name === "Maria Rossi" && item.reason === "Richiamo igiene automatico")) return current;
       return [
-        { name: "Maria Rossi", reason: "Richiamo igiene automatico", due: "Oggi", channel: "WhatsApp", status: "Pronto per invio" },
-        { name: "Antonio Greco", reason: "Richiamo igiene automatico", due: "Lunedi 25 maggio", channel: "SMS", status: "In coda" },
+        { name: "Maria Rossi", reason: "Richiamo igiene automatico", due: "Oggi", channel: "WhatsApp", status: "Invio automatico" },
+        { name: "Antonio Greco", reason: "Richiamo igiene automatico", due: "Lunedi 25 maggio", channel: "SMS", status: "Programmato" },
         ...current,
       ];
     });
+    pushNotification({
+      title: "Follow-up igiene attivato",
+      detail: "Il sistema ha creato la coda automatica per i pazienti vicini alla scadenza.",
+      target: "followup",
+      tone: "teal",
+    });
+  }
+
+  function runQuoteAutomation(quote = selectedQuote, navigate = true) {
+    const targetQuote = quote || quoteRecords[0] || quotes[0];
+    setGuidedScenario("preventivo");
+    setSelectedQuote(targetQuote);
+    if (navigate) setActiveSection("preventivi");
+    setQuoteAutomationStatus("running");
+    setQuoteAutomationLog([
+      `Sequenza automatica avviata per ${targetQuote.name}.`,
+      "Giorno 3: messaggio gentile inviato sul canale preferito.",
+      "Giorno 7: reminder automatico programmato se non arriva risposta.",
+    ]);
+    patchQuote(
+      targetQuote,
+      { status: "Sequenza automatica", last: "Messaggio giorno 3 inviato", next: "Reminder automatico giorno 7" },
+      ["Sequenza automatica attivata: messaggio giorno 3 inviato."]
+    );
+    pushNotification({
+      title: "Sequenza preventivo avviata",
+      detail: `${targetQuote.name} entra nel follow-up automatico del preventivo.`,
+      target: "preventivi",
+      tone: "amber",
+    });
+
+    setTimeout(() => {
+      setQuoteAutomationLog((current) => ["Giorno 7: reminder automatico inviato con disponibilita per chiarimenti.", ...current]);
+      patchQuote(
+        targetQuote,
+        { last: "Reminder giorno 7 inviato", next: "Proposta chiamata giorno 14" },
+        ["Reminder giorno 7 inviato automaticamente."]
+      );
+    }, 700);
+
+    setTimeout(() => {
+      setQuoteAutomationStatus("complete");
+      setQuoteAutomationLog((current) => [
+        `${targetQuote.name} ha chiesto un chiarimento: conversazione aggiornata nei messaggi.`,
+        "Giorno 14: proposta di chiamata pronta in caso di mancata risposta.",
+        ...current,
+      ]);
+      patchQuote(
+        targetQuote,
+        { status: "Chiarimento richiesto", last: "Risposta ricevuta", next: "Proporre chiamata con lo studio" },
+        ["Il paziente ha chiesto un chiarimento dopo il reminder automatico."]
+      );
+      addOrUpdateConversation({
+        id: `${targetQuote.name.toLowerCase().replace(/\s+/g, "-")}-preventivo`,
+        name: targetQuote.name,
+        channel: "WhatsApp",
+        status: "Chiarimento richiesto",
+        preview: "Vorrei un chiarimento sul preventivo.",
+        messages: [
+          { from: "Studio", text: `Ciao ${targetQuote.name.split(" ")[0]}, volevamo sapere se hai avuto modo di valutare il preventivo. Possiamo fissare una breve chiamata con lo studio per chiarire ogni dubbio?` },
+          { from: targetQuote.name.split(" ")[0], text: "Vorrei un chiarimento sul preventivo." },
+        ],
+      });
+      pushNotification({
+        title: "Risposta su preventivo",
+        detail: `${targetQuote.name} ha chiesto un chiarimento dopo il follow-up automatico.`,
+        target: "messaggi",
+        tone: "teal",
+      });
+    }, 1400);
+  }
+
+  function startGuidedScenario(scenarioId) {
+    setGuidedScenario(scenarioId);
+    if (scenarioId === "rinuncia") {
+      resetScenario();
+      simulateCancellation();
+      setTimeout(() => runFillGapCampaign("auto", true), 900);
+      return;
+    }
+    if (scenarioId === "inattivo") {
+      setActiveSection("followup");
+      activateFollowup();
+      return;
+    }
+    if (scenarioId === "preventivo") {
+      runQuoteAutomation(selectedQuote || quoteRecords[0] || quotes[0], true);
+    }
+  }
+
+  function runDaySimulation() {
+    setGuidedScenario("giornata");
+    setSelectedAgendaDay(demoAgendaDate);
+    markSlotAsOpen("manual");
+    addOrUpdateConversation({
+      id: "giulia-rinuncia",
+      name: "Giulia Ferri",
+      channel: "WhatsApp",
+      status: "Rinuncia ricevuta",
+      preview: "Devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00.",
+      messages: [
+        { from: "Giulia", text: "Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace." },
+        { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
+      ],
+    });
+    activateFollowup();
+    runQuoteAutomation(selectedQuote || quoteRecords[0] || quotes[0], false);
+    setGuidedScenario("giornata");
+    setTimeout(() => runFillGapCampaign("auto", true), 600);
+    pushNotification({
+      title: "Giornata simulata avviata",
+      detail: "Rinuncia, follow-up igiene e preventivo aperto sono stati messi in movimento.",
+      target: "messaggi",
+      tone: "teal",
+    });
+    setActiveSection("messaggi");
   }
 
   function connectWhatsAppDemo() {
@@ -823,10 +1088,53 @@ function DemoStudioDentisticoApp() {
   });
 
   const filteredWaitlist = waitlist.filter((item) => waitFilter === "Tutti" || item.treatment === waitFilter || item.channel === waitFilter || item.fit === waitFilter);
-  const filteredQuotes = quotes.filter((quote) => quoteFilter === "Tutti" || quote.status === quoteFilter || quote.probability === quoteFilter);
+  const filteredQuotes = quoteRecords.filter((quote) => quoteFilter === "Tutti" || quote.status === quoteFilter || quote.probability === quoteFilter);
+  const timelineSteps = getTimelineSteps();
+
+  function getTimelineSteps() {
+    if (guidedScenario === "inattivo") {
+      return [
+        { label: "Scadenza rilevata", detail: "Paziente vicino al richiamo igiene.", done: followupActive, active: !followupActive },
+        { label: "Regola applicata", detail: "Trigger igiene completata e attesa configurata.", done: followupActive, active: followupActive },
+        { label: "Messaggio inviato", detail: "Canale scelto in base a consenso e preferenza.", done: followupActive, active: false },
+        { label: "Coda aggiornata", detail: "Il CRM mostra stato e prossima azione.", done: followupActive, active: false },
+      ];
+    }
+    if (guidedScenario === "preventivo") {
+      return [
+        { label: "Preventivo aperto", detail: "Trattamento inviato e non ancora confermato.", done: quoteAutomationStatus !== "idle", active: quoteAutomationStatus === "idle" },
+        { label: "Messaggio giorno 3", detail: "Contatto gentile automatico.", done: quoteAutomationStatus !== "idle", active: quoteAutomationStatus === "running" },
+        { label: "Reminder giorno 7", detail: "Disponibilita per chiarimenti.", done: quoteAutomationStatus !== "idle", active: quoteAutomationStatus === "running" },
+        { label: "Risposta o call", detail: "Il sistema registra la risposta nei messaggi.", done: quoteAutomationStatus === "complete", active: quoteAutomationStatus === "running" },
+      ];
+    }
+    if (guidedScenario === "giornata") {
+      return [
+        { label: "Eventi acquisiti", detail: "Rinuncia, richiamo e preventivo aperto.", done: true, active: false },
+        { label: "Automazioni avviate", detail: "Fill the Gap, follow-up e preventivi lavorano insieme.", done: true, active: false },
+        { label: "Messaggi generati", detail: "Le conversazioni si aggiornano nella inbox.", done: quoteAutomationStatus !== "idle", active: quoteAutomationStatus === "running" },
+        { label: "Agenda e CRM", detail: "Slot, pazienti e preventivi restano sincronizzati.", done: gapStatus === "filled" || quoteAutomationStatus === "complete", active: gapStatus !== "filled" },
+      ];
+    }
+    return [
+      { label: "Evento rilevato", detail: "Rinuncia o opportunita operativa.", done: gapStatus !== "idle", active: gapStatus === "idle" },
+      { label: "Pazienti selezionati", detail: "Lista compatibile con consenso attivo.", done: gapStatus === "sending" || gapStatus === "filled", active: gapStatus === "detected" },
+      { label: "Messaggi inviati", detail: "WhatsApp, SMS o email secondo preferenza.", done: gapStatus === "filled", active: gapStatus === "sending" },
+      { label: "Agenda aggiornata", detail: "La conferma valida occupa lo slot.", done: gapStatus === "filled", active: false },
+    ];
+  }
 
   if (activeSection === "home") {
-    return <HomeScreen sections={sections} setActiveSection={setActiveSection} />;
+    return (
+      <HomeScreen
+        sections={sections}
+        notifications={notifications}
+        timelineSteps={timelineSteps}
+        startGuidedScenario={startGuidedScenario}
+        runDaySimulation={runDaySimulation}
+        setActiveSection={setActiveSection}
+      />
+    );
   }
 
   return (
@@ -918,7 +1226,16 @@ function DemoStudioDentisticoApp() {
             <WaitlistSection items={filteredWaitlist} filter={waitFilter} setFilter={setWaitFilter} setActiveSection={setActiveSection} />
           )}
           {activeSection === "preventivi" && (
-            <QuotesSection quotes={filteredQuotes} selectedQuote={selectedQuote} setSelectedQuote={setSelectedQuote} filter={quoteFilter} setFilter={setQuoteFilter} />
+            <QuotesSection
+              quotes={filteredQuotes}
+              selectedQuote={selectedQuote}
+              selectQuote={(quote) => runQuoteAutomation(quote, false)}
+              filter={quoteFilter}
+              setFilter={setQuoteFilter}
+              automationStatus={quoteAutomationStatus}
+              automationLog={quoteAutomationLog}
+              runQuoteAutomation={() => runQuoteAutomation(selectedQuote, false)}
+            />
           )}
           {activeSection === "automazioni" && (
             <AutomationsSection automations={automations} setAutomations={setAutomations} />
@@ -1304,7 +1621,7 @@ function FollowUpSection({ active, queue, log, activateFollowup }) {
                       <td className="px-6 py-4 text-slate-600">{item.reason}</td>
                       <td className="px-6 py-4 text-slate-600">{item.due}</td>
                       <td className="px-6 py-4 text-slate-600">{item.channel}</td>
-                      <td className="px-6 py-4"><Badge tone={item.status === "Da richiamare" ? "amber" : item.status === "In programma" ? "slate" : "teal"}>{item.status}</Badge></td>
+                      <td className="px-6 py-4"><Badge tone={item.status === "Chiamata consigliata" ? "amber" : item.status === "Programmato" ? "slate" : "teal"}>{item.status}</Badge></td>
                     </tr>
                   ))}
                 </tbody>
@@ -1539,6 +1856,22 @@ function PatientsSection({ patients, selectedPatient, setSelectedPatient, filter
   );
 }
 
+function patientRecommendation(patient) {
+  if (!patient.consent) {
+    return "Consenso non attivo: usare solo comunicazioni operative o contatto manuale quando necessario.";
+  }
+  if (patient.badges.some((badge) => badge.toLowerCase().includes("preventivo"))) {
+    return `Avviare follow-up preventivo su ${patient.preferredChannel}: il paziente ha un trattamento aperto e una prossima azione gia suggerita.`;
+  }
+  if (patient.badges.some((badge) => badge.toLowerCase().includes("inattivo"))) {
+    return `Avviare recupero paziente inattivo su ${patient.preferredChannel}: non risultano visite recenti e il consenso e attivo.`;
+  }
+  if (patient.suggested.toLowerCase().includes("igiene") || patient.badges.some((badge) => badge.toLowerCase().includes("igiene"))) {
+    return `Inserire nel richiamo igiene automatico su ${patient.preferredChannel}: storico e preferenze rendono il contatto adatto al follow-up.`;
+  }
+  return `Prossima azione consigliata: ${patient.suggested}. Canale preferito ${patient.preferredChannel}, con storico visibile nella timeline.`;
+}
+
 function PatientDetail({ patient }) {
   if (!patient) return <Panel className="p-6"><EmptyLine>Seleziona un paziente.</EmptyLine></Panel>;
   return (
@@ -1549,6 +1882,10 @@ function PatientDetail({ patient }) {
           <p className="mt-1 text-sm text-slate-500">{patient.phone} · {patient.email}</p>
         </div>
         <Badge tone={patient.consent ? "teal" : "rose"}>{patient.consent ? "Consenso attivo" : "Consenso non attivo"}</Badge>
+      </div>
+      <div className="mt-5 rounded-lg border border-teal-200 bg-teal-50 p-4">
+        <div className="text-xs font-semibold uppercase tracking-wide text-teal-700">Suggerimento AI/CRM</div>
+        <p className="mt-2 text-sm leading-6 text-teal-900">{patientRecommendation(patient)}</p>
       </div>
       <div className="mt-5 grid grid-cols-1 gap-3 text-sm">
         <Field label="Canale preferito" value={patient.preferredChannel} />
@@ -1619,7 +1956,14 @@ function WaitlistSection({ items, filter, setFilter, setActiveSection }) {
   );
 }
 
-function QuotesSection({ quotes, selectedQuote, setSelectedQuote, filter, setFilter }) {
+function QuotesSection({ quotes, selectedQuote, selectQuote, filter, setFilter, automationStatus, automationLog, runQuoteAutomation }) {
+  const quoteSteps = [
+    { label: "Preventivo inviato", done: true, active: false },
+    { label: "Giorno 3", done: automationStatus !== "idle", active: automationStatus === "running" },
+    { label: "Giorno 7", done: automationStatus !== "idle", active: automationStatus === "running" },
+    { label: "Risposta o chiamata", done: automationStatus === "complete", active: automationStatus === "running" },
+  ];
+
   return (
     <PageFrame title="Preventivi" subtitle="Una vista ordinata per seguire i preventivi aperti senza lasciare la sequenza di contatto alla memoria della segreteria.">
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_430px]">
@@ -1635,7 +1979,7 @@ function QuotesSection({ quotes, selectedQuote, setSelectedQuote, filter, setFil
           </div>
           <div className="divide-y divide-slate-100">
             {quotes.map((quote) => (
-              <button key={`${quote.name}-${quote.treatment}`} type="button" onClick={() => setSelectedQuote(quote)} className={classNames("block w-full px-6 py-4 text-left hover:bg-slate-50", selectedQuote?.name === quote.name ? "bg-teal-50/70" : "bg-white")}>
+              <button key={`${quote.name}-${quote.treatment}`} type="button" onClick={() => selectQuote(quote)} className={classNames("block w-full px-6 py-4 text-left hover:bg-slate-50", selectedQuote?.name === quote.name ? "bg-teal-50/70" : "bg-white")}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="font-semibold text-slate-950">{quote.name}</div>
@@ -1643,7 +1987,7 @@ function QuotesSection({ quotes, selectedQuote, setSelectedQuote, filter, setFil
                   </div>
                   <div className="flex flex-wrap justify-end gap-2">
                     <Badge tone={quote.probability === "Alta" ? "teal" : "slate"}>{quote.probability}</Badge>
-                    <Badge tone={quote.status === "Da ricontattare" ? "amber" : "slate"}>{quote.status}</Badge>
+                    <Badge tone={quote.status === "Chiarimento richiesto" ? "teal" : quote.status === "Sequenza automatica" || quote.status === "Da ricontattare" ? "amber" : "slate"}>{quote.status}</Badge>
                   </div>
                 </div>
               </button>
@@ -1651,24 +1995,45 @@ function QuotesSection({ quotes, selectedQuote, setSelectedQuote, filter, setFil
           </div>
         </Panel>
 
-        <Panel className="p-6">
-          <h2 className="text-xl font-bold text-slate-950">{selectedQuote.name}</h2>
-          <p className="mt-1 text-sm text-slate-500">{selectedQuote.treatment}</p>
-          <div className="mt-5 space-y-3">
-            <Field label="Ultimo contatto" value={selectedQuote.last} />
-            <Field label="Prossima azione" value={selectedQuote.next} />
-            <Field label="Stato" value={selectedQuote.status} />
-          </div>
-          <div className="mt-5">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Timeline follow-up</div>
-            <div className="mt-3 space-y-3">
-              {selectedQuote.timeline.map((line, index) => <div key={`${line}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">{line}</div>)}
+        <div className="space-y-6">
+          <Panel className="p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-bold text-slate-950">{selectedQuote.name}</h2>
+                <p className="mt-1 text-sm text-slate-500">{selectedQuote.treatment}</p>
+              </div>
+              <Button onClick={runQuoteAutomation} disabled={automationStatus === "running"}>{automationStatus === "running" ? "Sequenza in corso" : "Avvia sequenza automatica"}</Button>
             </div>
-          </div>
-          <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700">
-            Ciao {selectedQuote.name.split(" ")[0]}, volevamo sapere se hai avuto modo di valutare il preventivo. Se vuoi, possiamo fissare una breve chiamata con lo studio per chiarire ogni dubbio.
-          </div>
-        </Panel>
+            <div className="mt-5 space-y-3">
+              <Field label="Ultimo contatto" value={selectedQuote.last} />
+              <Field label="Prossima azione" value={selectedQuote.next} />
+              <Field label="Stato" value={selectedQuote.status} />
+            </div>
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {quoteSteps.map((step) => (
+                <WorkflowState key={step.label} label={step.label} active={step.active} done={step.done} />
+              ))}
+            </div>
+            <div className="mt-5">
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Timeline follow-up</div>
+              <div className="mt-3 space-y-3">
+                {selectedQuote.timeline.map((line, index) => <div key={`${line}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">{line}</div>)}
+              </div>
+            </div>
+            <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700">
+              Ciao {selectedQuote.name.split(" ")[0]}, volevamo sapere se hai avuto modo di valutare il preventivo. Se vuoi, possiamo fissare una breve chiamata con lo studio per chiarire ogni dubbio.
+            </div>
+          </Panel>
+
+          <Panel className="p-6">
+            <h2 className="font-bold text-slate-950">Registro sequenza automatica</h2>
+            <div className="mt-4 space-y-3">
+              {automationLog.map((line, index) => (
+                <div key={`${line}-${index}`} className="rounded-lg border border-slate-200 bg-white p-3 text-sm leading-6 text-slate-600">{line}</div>
+              ))}
+            </div>
+          </Panel>
+        </div>
       </div>
     </PageFrame>
   );
