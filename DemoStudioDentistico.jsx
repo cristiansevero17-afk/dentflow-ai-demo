@@ -413,7 +413,7 @@ function DemoStudioDentisticoApp() {
   const [followupActive, setFollowupActive] = useState(false);
   const [followupQueue, setFollowupQueue] = useState(baseFollowUps);
   const [followupLog, setFollowupLog] = useState([
-    "Automazione richiamo igiene in bozza. Premi Attiva follow-up igiene per simulare l'avvio del processo.",
+    "Automazione richiamo igiene pronta. Premi Attiva follow-up igiene per simulare l'avvio automatico del processo.",
   ]);
   const [selectedPatient, setSelectedPatient] = useState(patients[0]);
   const [patientFilter, setPatientFilter] = useState("Tutti");
@@ -613,7 +613,7 @@ function DemoStudioDentisticoApp() {
       "Automazione richiamo igiene attivata.",
       "Il sistema ha letto le ultime igieni registrate e ha individuato i pazienti vicini alla scadenza.",
       "Maria Rossi e Antonio Greco sono stati aggiunti alla coda follow-up con canale e consenso verificati.",
-      "Il template del messaggio e pronto per invio o revisione da parte dello staff.",
+      "I messaggi vengono inviati automaticamente secondo regole, canale preferito e consenso configurati.",
     ]);
     setAutomations((current) =>
       current.map((automation) =>
@@ -1193,7 +1193,7 @@ function FollowUpSection({ active, queue, log, activateFollowup }) {
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Simulazione follow-up</div>
               <h2 className="mt-2 text-xl font-bold text-slate-950">Richiamo igiene ogni 6 mesi</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Con un click la demo mostra come il sistema legge le scadenze, mette i pazienti in coda e prepara il messaggio operativo per lo staff.
+                Con un click la demo mostra come il sistema legge le scadenze, mette i pazienti in coda e invia automaticamente il messaggio sul canale corretto.
               </p>
             </div>
             <Button onClick={activateFollowup} disabled={active}>{active ? "Follow-up igiene attivo" : "Attiva follow-up igiene"}</Button>
@@ -1203,12 +1203,12 @@ function FollowUpSection({ active, queue, log, activateFollowup }) {
             <WorkflowState active={!active} done={active} label="Regola configurata" />
             <WorkflowState active={active} done={active} label="Scadenze lette" />
             <WorkflowState active={active} done={active} label="Pazienti in coda" />
-            <WorkflowState active={active} done={active} label="Messaggio pronto" />
+            <WorkflowState active={active} done={active} label="Messaggi automatici" />
           </div>
 
           <div className={classNames("mt-6 rounded-lg border p-4 text-sm leading-6", active ? "border-teal-200 bg-teal-50 text-teal-900" : "border-slate-200 bg-slate-50 text-slate-600")}>
             {active
-              ? "Processo attivo: i pazienti idonei sono entrati nella coda follow-up e lo staff puo inviare o approvare il messaggio preparato."
+              ? "Processo attivo: i pazienti idonei entrano nella coda follow-up e il sistema invia automaticamente i richiami secondo regole, canale e consenso configurati."
               : "Prima dell'attivazione il sistema resta in bozza: puoi mostrare al titolare cosa succede premendo il pulsante di simulazione."}
           </div>
         </Panel>
