@@ -1,14 +1,14 @@
 import { useState, useEffect } from "react";
 
 const sections = [
-  { id: "agenda", label: "Agenda", mark: "AG" },
-  { id: "fillgap", label: "Fill the Gap", mark: "FG" },
-  { id: "followup", label: "Follow-up", mark: "FU" },
-  { id: "pazienti", label: "Pazienti", mark: "PZ" },
-  { id: "attesa", label: "Lista d'attesa", mark: "LA" },
-  { id: "preventivi", label: "Preventivi", mark: "PV" },
-  { id: "automazioni", label: "Automazioni", mark: "AU" },
-  { id: "messaggi", label: "Messaggi", mark: "MS" },
+  { id: "agenda", label: "Agenda", mark: "AG", emoji: "📅", preview: "Calendario mensile, slot liberi e rinunce da gestire." },
+  { id: "fillgap", label: "Fill the Gap", mark: "FG", emoji: "⚡", preview: "Simula una rinuncia e riempi automaticamente lo slot." },
+  { id: "followup", label: "Follow-up", mark: "FU", emoji: "🔁", preview: "Richiami automatici per controlli, igiene e pazienti inattivi." },
+  { id: "pazienti", label: "Pazienti", mark: "PZ", emoji: "👤", preview: "CRM con consensi, preferenze, storico e prossime azioni." },
+  { id: "attesa", label: "Lista d'attesa", mark: "LA", emoji: "⏳", preview: "Pazienti disponibili per appuntamenti anticipati." },
+  { id: "preventivi", label: "Preventivi", mark: "PV", emoji: "📋", preview: "Follow-up ordinato sui preventivi aperti." },
+  { id: "automazioni", label: "Automazioni", mark: "AU", emoji: "⚙️", preview: "Regole attive, trigger, canali e stato dei flussi." },
+  { id: "messaggi", label: "Messaggi", mark: "MS", emoji: "💬", preview: "Inbox simulata per WhatsApp, SMS ed email." },
 ];
 
 const whatsappLocalServerUrl = "http://localhost:8787";
@@ -365,7 +365,7 @@ function Panel({ children, className = "" }) {
   return <div className={classNames("rounded-lg border border-slate-200 bg-white shadow-sm", className)}>{children}</div>;
 }
 
-function Button({ children, onClick, variant = "primary", disabled = false, className = "" }) {
+function Button({ children, onClick, variant = "primary", disabled = false, className = "", type = "button" }) {
   const variants = {
     primary: "bg-teal-700 text-white hover:bg-teal-800",
     secondary: "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
@@ -374,7 +374,7 @@ function Button({ children, onClick, variant = "primary", disabled = false, clas
   };
   return (
     <button
-      type="button"
+      type={type}
       onClick={onClick}
       disabled={disabled}
       className={classNames(
@@ -404,8 +404,56 @@ function EmptyLine({ children }) {
   return <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">{children}</div>;
 }
 
+function HomeScreen({ sections, setActiveSection }) {
+  return (
+    <div className="min-h-screen w-screen overflow-y-auto bg-slate-50 font-sans text-slate-900">
+      <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-8 lg:px-10">
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-teal-700 text-sm font-bold text-white">D</div>
+            <div>
+              <div className="text-lg font-bold text-slate-950">Demo Studio Dentistico</div>
+              <div className="text-sm text-slate-500">Studio demo · Milano</div>
+            </div>
+          </div>
+          <Badge tone="teal">Sistema demo pronto</Badge>
+        </header>
+
+        <main className="flex flex-1 flex-col justify-center py-10">
+          <div className="max-w-3xl">
+            <div className="text-xs font-semibold uppercase tracking-wide text-teal-700">Console operativa</div>
+            <h1 className="mt-3 text-4xl font-bold tracking-normal text-slate-950">Scegli una sezione della demo</h1>
+            <p className="mt-4 text-base leading-7 text-slate-600">
+              Ogni area mostra una parte del flusso operativo dello studio: agenda, recupero slot, follow-up automatici, CRM e messaggi.
+            </p>
+          </div>
+
+          <div className="mt-9 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {sections.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => setActiveSection(section.id)}
+                className="group min-h-[180px] rounded-lg border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-2xl" aria-hidden="true">{section.emoji}</span>
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 transition group-hover:text-teal-700">{section.mark}</span>
+                </div>
+                <div className="mt-5 text-lg font-bold text-slate-950">{section.label}</div>
+                <p className="mt-2 min-h-[48px] text-sm leading-6 text-slate-500">{section.preview}</p>
+                <div className="mt-4 text-sm font-semibold text-teal-700">Apri sezione</div>
+              </button>
+            ))}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
+
 function DemoStudioDentisticoApp() {
-  const [activeSection, setActiveSection] = useState("agenda");
+  const [activeSection, setActiveSection] = useState("home");
   const [slots, setSlots] = useState(initialSlots);
   const [selectedAgendaDay, setSelectedAgendaDay] = useState(demoAgendaDate);
   const [gapStatus, setGapStatus] = useState("idle");
@@ -415,6 +463,7 @@ function DemoStudioDentisticoApp() {
   const [followupLog, setFollowupLog] = useState([
     "Automazione richiamo igiene pronta. Premi Attiva follow-up igiene per simulare l'avvio automatico del processo.",
   ]);
+  const [patientRecords, setPatientRecords] = useState(patients);
   const [selectedPatient, setSelectedPatient] = useState(patients[0]);
   const [patientFilter, setPatientFilter] = useState("Tutti");
   const [patientSearch, setPatientSearch] = useState("");
@@ -443,7 +492,7 @@ function DemoStudioDentisticoApp() {
     "Sistema pronto per ricevere messaggi operativi dai pazienti collegati alla demo.",
   ]);
 
-  const activeLabel = sections.find((section) => section.id === activeSection)?.label || "Agenda";
+  const activeLabel = sections.find((section) => section.id === activeSection)?.label || "Home";
   const targetSlot = slots.find((slot) => slot.time === "16:00");
   const selectedMonthDay = monthDays.find((day) => day.key === selectedAgendaDay) || monthDays.find((day) => day.key === demoAgendaDate);
   const selectedDaySlots =
@@ -760,7 +809,14 @@ function DemoStudioDentisticoApp() {
     setWhatsappEvents(["Scenario ripristinato. Puoi simulare una nuova rinuncia dall'agenda o dalla sezione messaggi."]);
   }
 
-  const filteredPatients = patients.filter((patient) => {
+  function addPatient(patient) {
+    setPatientRecords((current) => [patient, ...current]);
+    setSelectedPatient(patient);
+    setPatientSearch("");
+    setPatientFilter("Tutti");
+  }
+
+  const filteredPatients = patientRecords.filter((patient) => {
     const matchesSearch = patient.name.toLowerCase().includes(patientSearch.toLowerCase());
     const matchesFilter = patientFilter === "Tutti" || patient.badges.some((badge) => badge.toLowerCase().includes(patientFilter.toLowerCase()));
     return matchesSearch && matchesFilter;
@@ -769,16 +825,24 @@ function DemoStudioDentisticoApp() {
   const filteredWaitlist = waitlist.filter((item) => waitFilter === "Tutti" || item.treatment === waitFilter || item.channel === waitFilter || item.fit === waitFilter);
   const filteredQuotes = quotes.filter((quote) => quoteFilter === "Tutti" || quote.status === quoteFilter || quote.probability === quoteFilter);
 
+  if (activeSection === "home") {
+    return <HomeScreen sections={sections} setActiveSection={setActiveSection} />;
+  }
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-50 font-sans text-slate-900">
       <aside className="flex h-screen w-72 flex-shrink-0 flex-col border-r border-slate-200 bg-white">
-        <div className="flex h-24 flex-shrink-0 items-center gap-3 border-b border-slate-100 px-6">
+        <button
+          type="button"
+          onClick={() => setActiveSection("home")}
+          className="flex h-24 flex-shrink-0 items-center gap-3 border-b border-slate-100 px-6 text-left transition hover:bg-slate-50"
+        >
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-700 text-sm font-bold text-white">D</div>
           <div>
             <div className="font-bold text-slate-950">Demo Studio Dentistico</div>
             <div className="text-xs text-slate-500">Studio demo · Milano</div>
           </div>
-        </div>
+        </button>
 
         <nav className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
           <div className="space-y-1">
@@ -792,7 +856,7 @@ function DemoStudioDentisticoApp() {
                   activeSection === section.id ? "bg-teal-50 text-teal-800" : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                 )}
               >
-                <span className={classNames("flex h-8 w-8 items-center justify-center rounded-md border text-[11px] font-bold", activeSection === section.id ? "border-teal-200 bg-white text-teal-700" : "border-slate-200 bg-slate-50 text-slate-500")}>{section.mark}</span>
+                <span className={classNames("flex h-8 w-8 items-center justify-center rounded-md border text-base", activeSection === section.id ? "border-teal-200 bg-white" : "border-slate-200 bg-slate-50")} aria-hidden="true">{section.emoji}</span>
                 <span>{section.label}</span>
               </button>
             ))}
@@ -808,7 +872,6 @@ function DemoStudioDentisticoApp() {
           </div>
           <div className="flex items-center gap-3">
             <Badge tone="teal">Sistema demo pronto</Badge>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-sm font-bold text-white">A</div>
           </div>
         </header>
 
@@ -848,6 +911,7 @@ function DemoStudioDentisticoApp() {
               setFilter={setPatientFilter}
               search={patientSearch}
               setSearch={setPatientSearch}
+              addPatient={addPatient}
             />
           )}
           {activeSection === "attesa" && (
@@ -1289,12 +1353,96 @@ function Field({ label, value }) {
   );
 }
 
-function PatientsSection({ patients, selectedPatient, setSelectedPatient, filter, setFilter, search, setSearch }) {
+function createEmptyPatientDraft() {
+  return {
+    name: "",
+    phone: "",
+    email: "",
+    lastVisit: "",
+    nextVisit: "",
+    consent: true,
+    preferredChannel: "WhatsApp",
+    treatments: "",
+    suggested: "",
+    badges: "Consenso attivo",
+    notes: "",
+    timeline: "",
+  };
+}
+
+function PatientInput({ label, value, onChange, placeholder = "", type = "text" }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500"
+      />
+    </label>
+  );
+}
+
+function PatientTextArea({ label, value, onChange, placeholder = "" }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        rows={3}
+        className="mt-2 w-full resize-none rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500"
+      />
+    </label>
+  );
+}
+
+function PatientsSection({ patients, selectedPatient, setSelectedPatient, filter, setFilter, search, setSearch, addPatient }) {
+  const [showForm, setShowForm] = useState(false);
+  const [draft, setDraft] = useState(createEmptyPatientDraft);
+
+  function updateDraft(field, value) {
+    setDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function submitPatient(event) {
+    event.preventDefault();
+    const badges = draft.badges
+      .split(",")
+      .map((badge) => badge.trim())
+      .filter(Boolean);
+    const consentBadge = draft.consent ? "Consenso attivo" : "Consenso non attivo";
+    const customBadges = badges.filter((badge) => !["consenso attivo", "consenso non attivo"].includes(badge.toLowerCase()));
+    const patient = {
+      name: draft.name.trim() || "Nuovo paziente",
+      phone: draft.phone.trim() || "Telefono non inserito",
+      email: draft.email.trim() || "Email non inserita",
+      lastVisit: draft.lastVisit.trim() || "Nessun appuntamento registrato",
+      nextVisit: draft.nextVisit.trim() || "Nessun appuntamento",
+      consent: draft.consent,
+      preferredChannel: draft.preferredChannel,
+      treatments: draft.treatments.trim() || "Da completare",
+      suggested: draft.suggested.trim() || "Da valutare",
+      badges: [consentBadge, ...customBadges],
+      notes: draft.notes.trim() || "Scheda creata dalla demo.",
+      timeline: [
+        "Scheda paziente creata manualmente dalla segreteria.",
+        draft.timeline.trim() || "Prima azione consigliata da definire.",
+      ],
+    };
+    addPatient(patient);
+    setDraft(createEmptyPatientDraft());
+    setShowForm(false);
+  }
+
   return (
     <PageFrame title="Pazienti" subtitle="CRM operativo dello studio: consensi, preferenze, trattamenti e prossima azione consigliata sono visibili in un unico punto.">
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_430px]">
         <Panel className="overflow-hidden">
-          <div className="flex flex-wrap gap-3 border-b border-slate-100 px-6 py-5">
+          <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-6 py-5">
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -1309,7 +1457,60 @@ function PatientsSection({ patients, selectedPatient, setSelectedPatient, filter
               <option>Inattivo</option>
               <option>Consenso attivo</option>
             </select>
+            <Button onClick={() => setShowForm((current) => !current)} variant={showForm ? "secondary" : "primary"}>
+              {showForm ? "Chiudi inserimento" : "Nuovo paziente"}
+            </Button>
           </div>
+
+          {showForm && (
+            <form onSubmit={submitPatient} className="border-b border-slate-100 bg-slate-50 px-6 py-5">
+              <div className="mb-4">
+                <h2 className="font-bold text-slate-950">Inserisci nuovo paziente</h2>
+                <p className="mt-1 text-sm text-slate-500">Compila i dati principali: il paziente verra aggiunto al CRM e selezionato nella scheda dettaglio.</p>
+              </div>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <PatientInput label="Nome e cognome" value={draft.name} onChange={(value) => updateDraft("name", value)} placeholder="Es. Francesca Neri" />
+                <PatientInput label="Telefono" value={draft.phone} onChange={(value) => updateDraft("phone", value)} placeholder="+39 333 000 0000" />
+                <PatientInput label="Email" value={draft.email} onChange={(value) => updateDraft("email", value)} placeholder="nome@email.it" type="email" />
+                <PatientInput label="Ultimo appuntamento" value={draft.lastVisit} onChange={(value) => updateDraft("lastVisit", value)} placeholder="Igiene dentale, 4 mesi fa" />
+                <PatientInput label="Prossimo appuntamento" value={draft.nextVisit} onChange={(value) => updateDraft("nextVisit", value)} placeholder="Nessun appuntamento" />
+                <label className="block">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Canale preferito</span>
+                  <select
+                    value={draft.preferredChannel}
+                    onChange={(event) => updateDraft("preferredChannel", event.target.value)}
+                    className="mt-2 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500"
+                  >
+                    <option>WhatsApp</option>
+                    <option>SMS</option>
+                    <option>Email</option>
+                    <option>Telefonata</option>
+                  </select>
+                </label>
+                <PatientInput label="Trattamenti effettuati" value={draft.treatments} onChange={(value) => updateDraft("treatments", value)} placeholder="Igiene, controllo" />
+                <PatientInput label="Trattamenti consigliati" value={draft.suggested} onChange={(value) => updateDraft("suggested", value)} placeholder="Richiamo igiene" />
+                <PatientInput label="Badge" value={draft.badges} onChange={(value) => updateDraft("badges", value)} placeholder="Consenso attivo, Follow-up attivo" />
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <PatientTextArea label="Note" value={draft.notes} onChange={(value) => updateDraft("notes", value)} placeholder="Preferenze, disponibilita, indicazioni operative." />
+                <PatientTextArea label="Prima nota timeline" value={draft.timeline} onChange={(value) => updateDraft("timeline", value)} placeholder="Es. Paziente interessato a igiene nel tardo pomeriggio." />
+              </div>
+              <label className="mt-4 flex items-center gap-3 text-sm font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={draft.consent}
+                  onChange={(event) => updateDraft("consent", event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-teal-700"
+                />
+                Consenso comunicazioni attivo
+              </label>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <Button type="submit">Salva paziente</Button>
+                <Button type="button" variant="secondary" onClick={() => { setDraft(createEmptyPatientDraft()); setShowForm(false); }}>Annulla</Button>
+              </div>
+            </form>
+          )}
+
           <div className="divide-y divide-slate-100">
             {patients.map((patient) => (
               <button
