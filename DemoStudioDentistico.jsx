@@ -1615,7 +1615,7 @@ function DemoStudioDentisticoApp() {
           </div>
         </header>
 
-        <div data-app-scroll className="min-w-0 flex-1 overflow-y-scroll">
+        <div data-app-scroll className="min-w-0 flex-1 overflow-x-hidden overflow-y-scroll">
           {activeSection === "guidata" && (
             <GuidedDemoSection
               notifications={notifications}
@@ -2638,8 +2638,8 @@ function PatientDetail({ patient }) {
 function WaitlistSection({ items, filter, setFilter, setActiveSection }) {
   return (
     <PageFrame title="Lista d'attesa" subtitle="La lista d'attesa alimenta il Fill the Gap: lo staff vede chi puo' essere contattato, con quale canale e in quale fascia oraria.">
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
-        <Panel className="overflow-hidden">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_300px] 2xl:grid-cols-[minmax(0,1fr)_320px]">
+        <Panel className="min-w-0 overflow-hidden">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
             <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500">
               <option>Tutti</option>
@@ -2649,29 +2649,33 @@ function WaitlistSection({ items, filter, setFilter, setActiveSection }) {
             </select>
             <Button onClick={() => setActiveSection("fillgap")} variant="secondary">Usa nel Fill the Gap</Button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+          <div className="overflow-hidden">
+            <table className="w-full table-fixed text-left text-xs lg:text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-6 py-3">Paziente</th>
-                  <th className="px-6 py-3">Trattamento</th>
-                  <th className="px-6 py-3">Fascia preferita</th>
-                  <th className="px-6 py-3">Urgenza</th>
-                  <th className="px-6 py-3">Last-minute</th>
-                  <th className="px-6 py-3">Canale</th>
-                  <th className="px-6 py-3">Compatibilita'</th>
+                  <th className="w-[16%] break-words px-2 py-3 lg:px-3">Paziente</th>
+                  <th className="w-[17%] break-words px-2 py-3 lg:px-3">Trattamento</th>
+                  <th className="w-[16%] break-words px-2 py-3 lg:px-3">Fascia</th>
+                  <th className="w-[10%] break-words px-2 py-3 lg:px-3">Urgenza</th>
+                  <th className="w-[10%] break-words px-2 py-3 lg:px-3">Last-min.</th>
+                  <th className="w-[11%] break-words px-2 py-3 lg:px-3">Canale</th>
+                  <th className="w-[20%] break-words px-2 py-3 lg:px-3">Compatibilita'</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {items.map((item) => (
                   <tr key={item.name} className="bg-white">
-                    <td className="px-6 py-4 font-semibold text-slate-950">{item.name}</td>
-                    <td className="px-6 py-4 text-slate-600">{item.treatment}</td>
-                    <td className="px-6 py-4 text-slate-600">{item.preference}</td>
-                    <td className="px-6 py-4"><Badge tone={item.urgency === "Alta" ? "amber" : "slate"}>{item.urgency}</Badge></td>
-                    <td className="px-6 py-4 text-slate-600">{item.lastMinute}</td>
-                    <td className="px-6 py-4 text-slate-600">{item.channel}</td>
-                    <td className="px-6 py-4"><Badge tone={item.consent ? "teal" : "rose"}>{item.fit}</Badge></td>
+                    <td className="break-words px-2 py-4 font-semibold text-slate-950 lg:px-3">{item.name}</td>
+                    <td className="break-words px-2 py-4 text-slate-600 lg:px-3">{item.treatment}</td>
+                    <td className="break-words px-2 py-4 text-slate-600 lg:px-3">{item.preference}</td>
+                    <td className="px-2 py-4 lg:px-3">
+                      <span className={classNames("inline-flex max-w-full items-center rounded-full border px-2 py-1 text-center text-xs font-medium leading-4", item.urgency === "Alta" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-50 text-slate-600")}>{item.urgency}</span>
+                    </td>
+                    <td className="px-2 py-4 text-slate-600 lg:px-3">{item.lastMinute}</td>
+                    <td className="break-words px-2 py-4 text-slate-600 lg:px-3">{item.channel}</td>
+                    <td className="px-2 py-4 lg:px-3">
+                      <span className={classNames("inline-flex max-w-full items-center justify-center rounded-full border px-2 py-1 text-center text-xs font-medium leading-4", item.consent ? "border-teal-200 bg-teal-50 text-teal-700" : "border-rose-200 bg-rose-50 text-rose-700")}>{item.fit}</span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -2679,7 +2683,7 @@ function WaitlistSection({ items, filter, setFilter, setActiveSection }) {
           </div>
         </Panel>
 
-        <Panel className="p-6">
+        <Panel className="p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="font-bold text-slate-950">Criteri compatibilita'</h2>
