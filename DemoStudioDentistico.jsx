@@ -1613,6 +1613,13 @@ function DemoStudioDentisticoApp() {
             <div className="text-sm font-bold text-slate-950">{activeLabel}</div>
             <div className="mt-1 text-xs text-slate-500">Console demo · simulazione studio dentistico</div>
           </div>
+          <button
+            type="button"
+            onClick={() => setActiveSection("home")}
+            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
+          >
+            Home
+          </button>
         </header>
 
         <div data-app-scroll className="min-w-0 flex-1 overflow-x-hidden overflow-y-scroll">
