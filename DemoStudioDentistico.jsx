@@ -71,6 +71,15 @@ const fillGapSteps = [
   },
 ];
 
+const messageScenarioSteps = [
+  "Rinuncia ricevuta",
+  "Risposta studio",
+  "Slot liberato",
+  "Pazienti contattati",
+  "Prima conferma",
+  "Agenda aggiornata",
+];
+
 const initialNotifications = [
   { title: "Rinuncia possibile da gestire", detail: "Slot igiene del 25 maggio alle 16:00 pronto per simulare il Fill the Gap.", target: "agenda", tone: "amber" },
   { title: "Richiami igiene in scadenza", detail: "Sara Colombo e altri pazienti possono entrare nel follow-up automatico.", target: "followup", tone: "teal" },
@@ -726,6 +735,8 @@ function DemoStudioDentisticoApp() {
   const [automations, setAutomations] = useState(initialAutomations);
   const [conversations, setConversations] = useState(initialConversations);
   const [selectedConversation, setSelectedConversation] = useState(initialConversations[0]);
+  const [messageScenarioStep, setMessageScenarioStep] = useState(0);
+  const [messageScenarioRunning, setMessageScenarioRunning] = useState(false);
   const [notifications, setNotifications] = useState(initialNotifications);
   const [guidedScenario, setGuidedScenario] = useState("idle");
   const [whatsappStatus, setWhatsappStatus] = useState("not_connected");
@@ -748,6 +759,8 @@ function DemoStudioDentisticoApp() {
   ]);
   const gapTimersRef = useRef([]);
   const gapRunRef = useRef(0);
+  const messageTimersRef = useRef([]);
+  const messageRunRef = useRef(0);
 
   const activeLabel = sections.find((section) => section.id === activeSection)?.label || "Home";
   const targetSlot = slots.find((slot) => slot.time === "16:00");
@@ -773,6 +786,10 @@ function DemoStudioDentisticoApp() {
     return () => clearGapTimers();
   }, []);
 
+  useEffect(() => {
+    return () => clearMessageTimers();
+  }, []);
+
   function clearGapTimers() {
     gapTimersRef.current.forEach((timer) => clearTimeout(timer));
     gapTimersRef.current = [];
@@ -790,6 +807,25 @@ function DemoStudioDentisticoApp() {
       if (gapRunRef.current === runId) action();
     }, delay);
     gapTimersRef.current.push(timer);
+  }
+
+  function clearMessageTimers() {
+    messageTimersRef.current.forEach((timer) => clearTimeout(timer));
+    messageTimersRef.current = [];
+    messageRunRef.current += 1;
+  }
+
+  function beginMessageRun() {
+    clearMessageTimers();
+    messageRunRef.current += 1;
+    return messageRunRef.current;
+  }
+
+  function scheduleMessageStep(runId, delay, action) {
+    const timer = setTimeout(() => {
+      if (messageRunRef.current === runId) action();
+    }, delay);
+    messageTimersRef.current.push(timer);
   }
 
   useEffect(() => {
@@ -908,6 +944,123 @@ function DemoStudioDentisticoApp() {
       const exists = current.some((conversation) => conversation.id === nextConversation.id);
       if (exists) return current.map((conversation) => (conversation.id === nextConversation.id ? nextConversation : conversation));
       return [nextConversation, ...current];
+    });
+  }
+
+  function setLiveMessageConversation(messages, status = "In corso", preview = "Simulazione rinuncia e riempimento slot in corso.") {
+    const nextConversation = {
+      id: "messaggi-live-fillgap",
+      name: "Simulazione rinuncia live",
+      channel: "WhatsApp + AI",
+      status,
+      preview,
+      messages,
+    };
+    addOrUpdateConversation(nextConversation);
+    setSelectedConversation(nextConversation);
+  }
+
+  function runMessagesFillGapSimulation() {
+    const runId = beginMessageRun();
+    clearGapTimers();
+    setSelectedAgendaDay(demoAgendaDate);
+    setGuidedScenario("rinuncia");
+    setMessageScenarioRunning(true);
+    setMessageScenarioStep(1);
+    setGapSimulationRunning(false);
+    setGapStatus("idle");
+    setGapStep(0);
+    setGapLog([]);
+    setSlots((current) =>
+      current.map((slot) =>
+        slot.time === "16:00"
+          ? { ...slot, patient: "Giulia Ferri", treatment: "Igiene dentale", status: "confermato", channel: "WhatsApp" }
+          : slot
+      )
+    );
+
+    const firstMessages = [
+      { from: "Giulia", text: "Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace." },
+    ];
+    setLiveMessageConversation(firstMessages, "Rinuncia ricevuta", "Giulia rinuncia allo slot delle 16:00.");
+
+    scheduleMessageStep(runId, 700, () => {
+      const messages = [
+        ...firstMessages,
+        { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
+      ];
+      setMessageScenarioStep(2);
+      setLiveMessageConversation(messages, "Risposta inviata", "Lo studio conferma la presa in carico della rinuncia.");
+    });
+
+    scheduleMessageStep(runId, 1400, () => {
+      const messages = [
+        ...firstMessages,
+        { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
+        { from: "Sistema", text: "Slot liberato in agenda: lunedi 25 maggio, ore 16:00, igiene dentale." },
+      ];
+      setSlots((current) =>
+        current.map((slot) =>
+          slot.time === "16:00"
+            ? { ...slot, patient: "Slot da riempire", treatment: "Igiene dentale", status: "da riempire", channel: "WhatsApp" }
+            : slot
+        )
+      );
+      setGapStatus("detected");
+      setGapStep(2);
+      setGapLog(["Slot libero creato in agenda: igiene dentale delle 16:00 da riempire."]);
+      setMessageScenarioStep(3);
+      setLiveMessageConversation(messages, "Slot liberato", "Il sistema ha aperto lo slot in agenda.");
+    });
+
+    scheduleMessageStep(runId, 2300, () => {
+      const messages = [
+        ...firstMessages,
+        { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
+        { from: "Sistema", text: "Slot liberato in agenda: lunedi 25 maggio, ore 16:00, igiene dentale." },
+        { from: "Sistema", text: "Pazienti compatibili trovati: Maria Rossi, Luca Bianchi, Sara Colombo e Antonio Greco." },
+        { from: "Studio AI", text: "Ciao Maria, si e' appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale. Vuoi confermare?" },
+        { from: "Studio AI", text: "Ciao Luca, abbiamo una disponibilita' anticipata lunedi alle 16:00 per controllo. Ti interessa?" },
+        { from: "Studio AI", text: "Ciao Sara, si e' liberato uno slot per igiene dentale lunedi alle 16:00. Vuoi bloccarlo?" },
+      ];
+      setGapStatus("sending");
+      setGapStep(5);
+      setGapLog((current) => ["Messaggi automatici inviati ai pazienti compatibili con consenso attivo.", ...current]);
+      setMessageScenarioStep(4);
+      setLiveMessageConversation(messages, "Messaggi inviati", "La campagna automatica e' partita sui pazienti compatibili.");
+    });
+
+    scheduleMessageStep(runId, 3400, () => {
+      const messages = [
+        ...firstMessages,
+        { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
+        { from: "Sistema", text: "Slot liberato in agenda: lunedi 25 maggio, ore 16:00, igiene dentale." },
+        { from: "Sistema", text: "Pazienti compatibili trovati: Maria Rossi, Luca Bianchi, Sara Colombo e Antonio Greco." },
+        { from: "Studio AI", text: "Ciao Maria, si e' appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale. Vuoi confermare?" },
+        { from: "Maria", text: "Si, confermo per lunedi 25 maggio alle 16:00." },
+        { from: "Luca", text: "Posso solo dopo le 17:00." },
+      ];
+      setGapStep(6);
+      setMessageScenarioStep(5);
+      setLiveMessageConversation(messages, "Prima conferma", "Maria Rossi conferma lo slot disponibile.");
+    });
+
+    scheduleMessageStep(runId, 4500, () => {
+      const messages = [
+        ...firstMessages,
+        { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
+        { from: "Sistema", text: "Slot liberato in agenda: lunedi 25 maggio, ore 16:00, igiene dentale." },
+        { from: "Sistema", text: "Pazienti compatibili trovati: Maria Rossi, Luca Bianchi, Sara Colombo e Antonio Greco." },
+        { from: "Studio AI", text: "Ciao Maria, si e' appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale. Vuoi confermare?" },
+        { from: "Maria", text: "Si, confermo per lunedi 25 maggio alle 16:00." },
+        { from: "Sistema", text: "Prima risposta valida ricevuta. Lo slot e' stato assegnato a Maria Rossi e gli altri invii sono stati fermati." },
+        { from: "Studio", text: "Perfetto Maria, appuntamento confermato. A lunedi." },
+      ];
+      completeFillGapAssignment();
+      setGapStep(8);
+      setMessageScenarioStep(6);
+      setMessageScenarioRunning(false);
+      setLiveMessageConversation(messages, "Slot riempito", "Lo slot delle 16:00 e' stato riempito automaticamente.");
     });
   }
 
@@ -1537,7 +1690,15 @@ function DemoStudioDentisticoApp() {
             <AutomationsSection automations={automations} setAutomations={setAutomations} />
           )}
           {activeSection === "messaggi" && (
-            <MessagesSection conversations={conversations} selected={selectedConversation} setSelected={setSelectedConversation} setActiveSection={setActiveSection} />
+            <MessagesSection
+              conversations={conversations}
+              selected={selectedConversation}
+              setSelected={setSelectedConversation}
+              runLiveScenario={runMessagesFillGapSimulation}
+              scenarioStep={messageScenarioStep}
+              scenarioRunning={messageScenarioRunning}
+              slot={targetSlot}
+            />
           )}
         </div>
       </main>
@@ -2668,9 +2829,52 @@ function AutomationsSection({ automations, setAutomations }) {
   );
 }
 
-function MessagesSection({ conversations, selected, setSelected, setActiveSection }) {
+function MessagesSection({ conversations, selected, setSelected, runLiveScenario, scenarioStep, scenarioRunning, slot }) {
+  const activeConversation = selected || conversations[0];
+  const slotLabel = slot?.status || "confermato";
+
   return (
-    <PageFrame title="Messaggi" subtitle="Inbox simulata per vedere conversazioni WhatsApp, SMS ed email collegate ad agenda, Fill the Gap e follow-up.">
+    <PageFrame title="Messaggi" subtitle="Simulazione live della rinuncia via chat: il sistema risponde, libera lo slot, contatta i pazienti compatibili e aggiorna l'agenda.">
+      <Panel className="mb-6 p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950">Rinuncia e Fill the Gap automatico</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+              Avvia lo scenario e osserva tutta la sequenza dentro questa chat, senza intervento dello staff.
+            </p>
+          </div>
+          <Button onClick={runLiveScenario} disabled={scenarioRunning} className="w-full xl:w-auto">
+            {scenarioRunning ? "Simulazione in corso" : "Avvia simulazione rinuncia"}
+          </Button>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-6">
+          {messageScenarioSteps.map((step, index) => {
+            const done = index + 1 <= scenarioStep;
+            const current = index + 1 === scenarioStep && scenarioRunning;
+            return (
+              <div
+                key={step}
+                className={classNames(
+                  "rounded-lg border px-3 py-3 text-xs font-semibold",
+                  done ? "border-teal-200 bg-teal-50 text-teal-800" : "border-slate-200 bg-white text-slate-500",
+                  current ? "ring-2 ring-teal-100" : ""
+                )}
+              >
+                <div className="mb-1 text-[11px] uppercase tracking-wide opacity-70">Step {index + 1}</div>
+                {step}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <span className="font-semibold text-slate-950">Slot monitorato:</span>
+          <span>Lunedi 25 maggio, 16:00, igiene dentale</span>
+          <span className={classNames("rounded-full border px-2.5 py-1 text-xs font-semibold", statusStyle(slotLabel))}>{slotLabel}</span>
+        </div>
+      </Panel>
+
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[420px_1fr]">
         <Panel className="overflow-hidden">
           <div className="border-b border-slate-100 px-6 py-5">
@@ -2697,27 +2901,18 @@ function MessagesSection({ conversations, selected, setSelected, setActiveSectio
         <Panel className="flex min-h-[680px] flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
             <div>
-              <h2 className="font-bold text-slate-950">{selected.name}</h2>
-              <p className="mt-1 text-sm text-slate-500">{selected.channel} · {selected.status}</p>
+              <h2 className="font-bold text-slate-950">{activeConversation.name}</h2>
+              <p className="mt-1 text-sm text-slate-500">{activeConversation.channel} - {activeConversation.status}</p>
             </div>
-            <div className="flex gap-2">
-              <Button variant="secondary" onClick={() => setActiveSection("agenda")}>Prenota automaticamente</Button>
-              <Button variant="secondary" onClick={() => setActiveSection("followup")}>Segna da richiamare</Button>
-            </div>
+            <Badge tone={activeConversation.status === "Slot riempito" ? "teal" : "slate"}>{activeConversation.status}</Badge>
           </div>
-          <div className="flex-1 space-y-4 bg-slate-50 p-6">
-            {selected.messages.map((message, index) => (
-              <div key={`${message.from}-${index}`} className={classNames("max-w-[78%] rounded-lg border p-4 text-sm leading-6", message.from === "Studio" ? "ml-auto border-teal-100 bg-white text-slate-700" : "border-slate-200 bg-white text-slate-700")}>
+          <div className="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-6">
+            {activeConversation.messages.map((message, index) => (
+              <div key={`${message.from}-${index}`} className={classNames("max-w-[78%] rounded-lg border p-4 text-sm leading-6", message.from === "Studio" || message.from === "Studio AI" ? "ml-auto border-teal-100 bg-white text-slate-700" : message.from === "Sistema" ? "mx-auto border-slate-200 bg-white text-slate-700 shadow-sm" : "border-slate-200 bg-white text-slate-700")}>
                 <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{message.from}</div>
                 {message.text}
               </div>
             ))}
-          </div>
-          <div className="border-t border-slate-100 bg-white p-4">
-            <div className="flex gap-3">
-              <input className="min-w-0 flex-1 rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-teal-500" placeholder="Scrivi un messaggio simulato" />
-              <Button variant="primary">Invia demo</Button>
-            </div>
           </div>
         </Panel>
       </div>
