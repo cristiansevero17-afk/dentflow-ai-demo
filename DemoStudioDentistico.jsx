@@ -80,6 +80,13 @@ const messageScenarioSteps = [
   "Agenda aggiornata",
 ];
 
+const daySimulationSteps = [
+  { label: "Messaggio ricevuto", detail: "Il sistema legge una richiesta reale del paziente." },
+  { label: "Azione scelta", detail: "Capisce se deve liberare, spostare o proporre uno slot." },
+  { label: "Automazioni avviate", detail: "Agenda, follow-up, preventivi e messaggi si aggiornano." },
+  { label: "Esito tracciato", detail: "Lo staff vede cosa e' successo e cosa resta aperto." },
+];
+
 const initialNotifications = [
   { title: "Rinuncia possibile da gestire", detail: "Slot igiene del 25 maggio alle 16:00 pronto per simulare il Fill the Gap.", target: "agenda", tone: "amber" },
   { title: "Richiami igiene in scadenza", detail: "Sara Colombo e altri pazienti possono entrare nel follow-up automatico.", target: "followup", tone: "teal" },
@@ -445,6 +452,160 @@ const initialConversations = [
   },
 ];
 
+const messageIntentExamples = [
+  {
+    label: "Rinuncia appuntamento",
+    patient: "Giulia Ferri",
+    text: "Non posso piu' venire il giorno 27 maggio all'appuntamento.",
+  },
+  {
+    label: "Cambio orario",
+    patient: "Sara Colombo",
+    text: "Non posso piu' venire all'appuntamento di domani a quell'orario, possiamo anticipare?",
+  },
+  {
+    label: "Richiesta disponibilita'",
+    patient: "Antonio Greco",
+    text: "Avete un posto libero per caso settimana prossima, possibilmente di pomeriggio?",
+  },
+  {
+    label: "Preventivo",
+    patient: "Elena Conti",
+    text: "Vorrei parlare con il dottore del preventivo prima di confermare.",
+  },
+];
+
+function normalizeMessageText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function includesAny(text, keywords) {
+  return keywords.some((keyword) => text.includes(keyword));
+}
+
+function extractMessageSignals(message) {
+  const normalized = normalizeMessageText(message);
+  const dateMatch = String(message || "").match(/\b(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b/i);
+  const timeMatch = String(message || "").match(/\b(?:alle|ore)?\s*(\d{1,2})(?::|\.)(\d{2})\b|\b(?:alle|ore)\s+(\d{1,2})\b/i);
+  const weekday = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato"].find((day) => normalized.includes(day));
+  const preference =
+    normalized.includes("pomeriggio") ? "Pomeriggio" :
+    normalized.includes("mattina") ? "Mattina" :
+    normalized.includes("sera") || normalized.includes("dopo le") ? "Tardo pomeriggio" :
+    normalized.includes("anticip") ? "Anticipo richiesto" :
+    "";
+
+  return {
+    date: dateMatch ? `${dateMatch[1]} ${dateMatch[2].toLowerCase()}` : normalized.includes("domani") ? "domani" : normalized.includes("settimana prossima") ? "settimana prossima" : weekday || "",
+    time: timeMatch ? `${timeMatch[1] || timeMatch[3]}:${timeMatch[2] || "00"}` : normalized.includes("quell'orario") || normalized.includes("quel orario") ? "orario gia' prenotato" : "",
+    preference,
+  };
+}
+
+function analyzeClientMessage(message, patientName) {
+  const normalized = normalizeMessageText(message);
+  const signals = extractMessageSignals(message);
+  const hasCancellation = includesAny(normalized, ["non posso", "non riesco", "rinunc", "annull", "disdett", "cancell", "non vengo", "impossibile venire"]);
+  const hasReschedule = includesAny(normalized, ["anticip", "spost", "cambiare", "cambio", "altro orario", "quell'orario", "quel orario", "posticip"]);
+  const hasAvailability = includesAny(normalized, ["posto libero", "disponibil", "avete un posto", "settimana prossima", "prenotare", "quando avete"]);
+  const hasQuote = includesAny(normalized, ["preventivo", "prezzo", "costo", "dottore", "implant", "chiarimento"]);
+  const hasConfirmation = includesAny(normalized, ["confermo", "ok", "va bene", "ci sono", "si confermo", "si, confermo"]);
+  const firstName = patientName.split(" ")[0] || "Paziente";
+  const detected = [
+    `Paziente: ${patientName}`,
+    signals.date ? `Data: ${signals.date}` : "Data: da ricavare dal calendario",
+    signals.time ? `Orario: ${signals.time}` : "Orario: da verificare in agenda",
+    signals.preference ? `Preferenza: ${signals.preference}` : "Preferenza: non specificata",
+  ];
+
+  if (hasCancellation && hasReschedule) {
+    return {
+      intent: "spostamento",
+      intentLabel: "Spostamento appuntamento",
+      confidence: "Alta",
+      detected,
+      actionTitle: "Cerca alternativa e protegge lo slot originale",
+      actionDetail: "Il sistema controlla agenda e preferenze: propone un anticipo al paziente e, se lo slot originale viene liberato, prepara il Fill the Gap.",
+      reply: `Ciao ${firstName}, grazie per averci avvisato. Verifico subito un orario anticipato compatibile e ti propongo le prime disponibilita'.`,
+      status: "Spostamento gestito",
+      tone: "amber",
+    };
+  }
+
+  if (hasCancellation) {
+    return {
+      intent: "rinuncia",
+      intentLabel: "Rinuncia appuntamento",
+      confidence: "Alta",
+      detected,
+      actionTitle: "Libera lo slot e avvia Fill the Gap",
+      actionDetail: "Lo slot viene marcato come da riempire e il sistema prepara i pazienti compatibili da contattare automaticamente.",
+      reply: `Grazie ${firstName}, abbiamo ricevuto la rinuncia. Stiamo riorganizzando lo slot e ti proponiamo nuove disponibilita' appena possibile.`,
+      status: "Rinuncia gestita",
+      tone: "rose",
+    };
+  }
+
+  if (hasAvailability) {
+    return {
+      intent: "richiesta_disponibilita",
+      intentLabel: "Richiesta disponibilita'",
+      confidence: "Buona",
+      detected,
+      actionTitle: "Cerca slot compatibili in agenda",
+      actionDetail: "Il sistema filtra agenda, fascia preferita e canale del paziente, poi propone due opzioni libere.",
+      reply: `Ciao ${firstName}, abbiamo trovato due opzioni compatibili: martedi alle 15:30 oppure giovedi alle 17:00. Quale preferisci?`,
+      status: "Disponibilita' proposte",
+      tone: "teal",
+    };
+  }
+
+  if (hasQuote) {
+    return {
+      intent: "preventivo",
+      intentLabel: "Domanda su preventivo",
+      confidence: "Alta",
+      detected,
+      actionTitle: "Aggiorna preventivo e propone chiarimento",
+      actionDetail: "La richiesta viene collegata al preventivo aperto e il sistema propone una chiamata con lo studio.",
+      reply: `Ciao ${firstName}, certo. Possiamo fissare una breve chiamata con lo studio per chiarire ogni dubbio sul preventivo.`,
+      status: "Chiarimento preventivo",
+      tone: "amber",
+    };
+  }
+
+  if (hasConfirmation) {
+    return {
+      intent: "conferma",
+      intentLabel: "Conferma appuntamento",
+      confidence: "Alta",
+      detected,
+      actionTitle: "Conferma appuntamento in agenda",
+      actionDetail: "Il sistema registra la conferma e aggiorna lo stato della conversazione.",
+      reply: `Perfetto ${firstName}, appuntamento confermato. A presto.`,
+      status: "Confermato",
+      tone: "teal",
+    };
+  }
+
+  return {
+    intent: "generico",
+    intentLabel: "Richiesta generica",
+    confidence: "Media",
+    detected,
+    actionTitle: "Crea attivita' operativa",
+    actionDetail: "Il messaggio viene tracciato e messo in coda per una risposta automatica controllata.",
+    reply: `Ciao ${firstName}, grazie per il messaggio. Lo studio ha preso in carico la richiesta e ti risponde a breve.`,
+    status: "Richiesta presa in carico",
+    tone: "slate",
+  };
+}
+
 function classNames(...values) {
   return values.filter(Boolean).join(" ");
 }
@@ -576,7 +737,7 @@ function NotificationCenter({ notifications, setActiveSection }) {
   );
 }
 
-function DemoPitchPanel({ startGuidedScenario, runDaySimulation }) {
+function DemoPitchPanel({ startGuidedScenario }) {
   return (
     <Panel className="p-5">
       <div className="flex items-start justify-between gap-3">
@@ -593,15 +754,8 @@ function DemoPitchPanel({ startGuidedScenario, runDaySimulation }) {
       </div>
       <button
         type="button"
-        onClick={runDaySimulation}
-        className="mt-4 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-white"
-      >
-        Simula giornata completa
-      </button>
-      <button
-        type="button"
         onClick={() => document.documentElement.requestFullscreen?.()}
-        className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-slate-50"
+        className="mt-4 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-slate-50"
       >
         Modalita' presentazione
       </button>
@@ -662,7 +816,7 @@ function HomeScreen({ sections, setActiveSection }) {
   );
 }
 
-function GuidedDemoSection({ notifications, timelineSteps, startGuidedScenario, runDaySimulation, setActiveSection }) {
+function GuidedDemoSection({ notifications, timelineSteps, daySimulation, startGuidedScenario, runDaySimulation, setActiveSection }) {
   return (
     <PageFrame title="Demo guidata" subtitle="Scenari pronti per mostrare al titolare dello studio come la webapp reagisce a situazioni operative reali.">
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_380px]">
@@ -670,9 +824,9 @@ function GuidedDemoSection({ notifications, timelineSteps, startGuidedScenario, 
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="font-bold text-slate-950">Scenari dimostrativi</h2>
-              <p className="mt-1 text-sm leading-6 text-slate-500">Scegli uno scenario singolo o simula una giornata completa di studio.</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">Scegli uno scenario singolo o avvia una giornata guidata con passaggi visibili.</p>
             </div>
-            <Button onClick={runDaySimulation} variant="secondary">Simula giornata di studio</Button>
+            <Button onClick={runDaySimulation} variant="secondary">Avvia giornata guidata</Button>
           </div>
 
           <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -695,10 +849,38 @@ function GuidedDemoSection({ notifications, timelineSteps, startGuidedScenario, 
             <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Timeline scenario</div>
             <ScenarioTimeline steps={timelineSteps} />
           </div>
+
+          {daySimulation.status !== "idle" && (
+            <Panel className="mt-6 border-teal-200 p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-slate-950">Giornata guidata dello studio</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">La demo resta qui e mostra cosa viene aggiornato passo dopo passo.</p>
+                </div>
+                <Badge tone={daySimulation.status === "complete" ? "teal" : "amber"}>{daySimulation.status === "complete" ? "Completata" : "In corso"}</Badge>
+              </div>
+              <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+                {daySimulationSteps.map((step, index) => {
+                  const done = index + 1 <= daySimulation.step;
+                  return (
+                    <div key={step.label} className={classNames("rounded-lg border p-3", done ? "border-teal-200 bg-teal-50" : "border-slate-200 bg-white")}>
+                      <div className="text-sm font-semibold text-slate-950">{step.label}</div>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">{step.detail}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 space-y-2">
+                {daySimulation.events.map((event) => (
+                  <div key={event} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">{event}</div>
+                ))}
+              </div>
+            </Panel>
+          )}
         </Panel>
 
         <div className="space-y-6">
-          <DemoPitchPanel startGuidedScenario={startGuidedScenario} runDaySimulation={runDaySimulation} />
+          <DemoPitchPanel startGuidedScenario={startGuidedScenario} />
           <NotificationCenter notifications={notifications} setActiveSection={setActiveSection} />
         </div>
       </div>
@@ -737,8 +919,12 @@ function DemoStudioDentisticoApp() {
   const [selectedConversation, setSelectedConversation] = useState(initialConversations[0]);
   const [messageScenarioStep, setMessageScenarioStep] = useState(0);
   const [messageScenarioRunning, setMessageScenarioRunning] = useState(false);
+  const [triagePatient, setTriagePatient] = useState(messageIntentExamples[0].patient);
+  const [triageMessage, setTriageMessage] = useState(messageIntentExamples[0].text);
+  const [messageUnderstanding, setMessageUnderstanding] = useState(null);
   const [notifications, setNotifications] = useState(initialNotifications);
   const [guidedScenario, setGuidedScenario] = useState("idle");
+  const [daySimulation, setDaySimulation] = useState({ status: "idle", step: 0, events: [] });
   const [whatsappStatus, setWhatsappStatus] = useState("not_connected");
   const [realWhatsapp, setRealWhatsapp] = useState({
     available: false,
@@ -958,6 +1144,78 @@ function DemoStudioDentisticoApp() {
     };
     addOrUpdateConversation(nextConversation);
     setSelectedConversation(nextConversation);
+  }
+
+  function handleMessageExample(example) {
+    setTriagePatient(example.patient);
+    setTriageMessage(example.text);
+    setMessageUnderstanding(null);
+  }
+
+  function handleIncomingClientMessage() {
+    const analysis = analyzeClientMessage(triageMessage, triagePatient);
+    const firstName = triagePatient.split(" ")[0] || "Paziente";
+    const nextConversation = {
+      id: `triage-${triagePatient.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+      name: triagePatient,
+      channel: "WhatsApp + AI",
+      status: analysis.status,
+      preview: analysis.actionTitle,
+      messages: [
+        { from: firstName, text: triageMessage },
+        { from: "Sistema", text: `Richiesta riconosciuta: ${analysis.intentLabel}. Confidenza: ${analysis.confidence}.` },
+        { from: "Studio AI", text: analysis.reply },
+        { from: "Sistema", text: analysis.actionDetail },
+      ],
+    };
+
+    setMessageUnderstanding(analysis);
+    addOrUpdateConversation(nextConversation);
+    setSelectedConversation(nextConversation);
+
+    if (analysis.intent === "rinuncia") {
+      setSelectedAgendaDay(demoAgendaDate);
+      setSlots((current) =>
+        current.map((slot) =>
+          slot.time === "16:00"
+            ? { ...slot, patient: "Slot da riempire", treatment: "Igiene dentale", status: "da riempire", channel: "WhatsApp" }
+            : slot
+        )
+      );
+      setGapStatus("detected");
+      setGapStep(2);
+      setGapLog([
+        `${triagePatient} ha rinunciato: lo slot e' stato marcato da riempire.`,
+        "Il sistema ha preparato la ricerca pazienti compatibili per il Fill the Gap.",
+      ]);
+    }
+
+    if (analysis.intent === "spostamento") {
+      setGapStatus("detected");
+      setGapStep(3);
+      setGapLog([
+        `${triagePatient} chiede uno spostamento: il sistema cerca un nuovo orario e monitora lo slot originale.`,
+        "Se il paziente accetta l'anticipo, lo slot liberato entra nel Fill the Gap.",
+      ]);
+    }
+
+    if (analysis.intent === "preventivo") {
+      const matchingQuote = quoteRecords.find((quote) => quote.name === triagePatient) || selectedQuote || quoteRecords[0];
+      if (matchingQuote) {
+        patchQuote(
+          matchingQuote,
+          { status: "Chiarimento richiesto", last: "Richiesta da messaggio", next: "Proposta chiamata automatica" },
+          ["Richiesta preventivo riconosciuta dalla inbox messaggi."]
+        );
+      }
+    }
+
+    pushNotification({
+      title: `Messaggio riconosciuto: ${analysis.intentLabel}`,
+      detail: analysis.actionTitle,
+      target: "messaggi",
+      tone: analysis.tone,
+    });
   }
 
   function runMessagesFillGapSimulation() {
@@ -1359,8 +1617,22 @@ function DemoStudioDentisticoApp() {
     }
   }
 
+  function pushDaySimulationEvent(step, event, status = "running") {
+    setDaySimulation((current) => ({
+      status,
+      step,
+      events: [event, ...current.events].slice(0, 6),
+    }));
+  }
+
   function runDaySimulation() {
+    setActiveSection("guidata");
     setGuidedScenario("giornata");
+    setDaySimulation({
+      status: "running",
+      step: 1,
+      events: ["09:10 - Rinuncia ricevuta in chat: il sistema capisce che lo slot va riorganizzato."],
+    });
     setSelectedAgendaDay(demoAgendaDate);
     markSlotAsOpen("manual");
     addOrUpdateConversation({
@@ -1374,17 +1646,31 @@ function DemoStudioDentisticoApp() {
         { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
       ],
     });
-    activateFollowup();
-    runQuoteAutomation(selectedQuote || quoteRecords[0] || quotes[0], false);
-    setGuidedScenario("giornata");
-    setTimeout(() => runFillGapCampaign("auto", true), 600);
+    setTimeout(() => {
+      activateFollowup();
+      setGuidedScenario("giornata");
+      pushDaySimulationEvent(2, "09:12 - Richiami igiene controllati: i pazienti idonei entrano nella coda follow-up.");
+    }, 700);
+    setTimeout(() => {
+      runQuoteAutomation(selectedQuote || quoteRecords[0] || quotes[0], false);
+      setGuidedScenario("giornata");
+      pushDaySimulationEvent(3, "09:14 - Preventivo aperto riconosciuto: parte la sequenza di chiarimento automatico.");
+    }, 1400);
+    setTimeout(() => {
+      runFillGapCampaign("auto", true);
+      setGuidedScenario("giornata");
+      pushDaySimulationEvent(3, "09:16 - Fill the Gap avviato: messaggi inviati ai pazienti compatibili.");
+    }, 2100);
+    setTimeout(() => {
+      setGuidedScenario("giornata");
+      pushDaySimulationEvent(4, "09:20 - Esito tracciato: agenda, messaggi e follow-up risultano aggiornati.", "complete");
+    }, 5200);
     pushNotification({
       title: "Giornata simulata avviata",
-      detail: "Rinuncia, follow-up igiene e preventivo aperto sono stati messi in movimento.",
-      target: "messaggi",
+      detail: "La demo guidata mostra passo passo rinuncia, follow-up e preventivo.",
+      target: "guidata",
       tone: "teal",
     });
-    setActiveSection("messaggi");
   }
 
   function connectWhatsAppDemo() {
@@ -1627,6 +1913,7 @@ function DemoStudioDentisticoApp() {
             <GuidedDemoSection
               notifications={notifications}
               timelineSteps={timelineSteps}
+              daySimulation={daySimulation}
               startGuidedScenario={startGuidedScenario}
               runDaySimulation={runDaySimulation}
               setActiveSection={setActiveSection}
@@ -1702,6 +1989,14 @@ function DemoStudioDentisticoApp() {
               selected={selectedConversation}
               setSelected={setSelectedConversation}
               runLiveScenario={runMessagesFillGapSimulation}
+              triagePatient={triagePatient}
+              setTriagePatient={setTriagePatient}
+              triageMessage={triageMessage}
+              setTriageMessage={setTriageMessage}
+              messageUnderstanding={messageUnderstanding}
+              messageExamples={messageIntentExamples}
+              handleMessageExample={handleMessageExample}
+              handleIncomingClientMessage={handleIncomingClientMessage}
               scenarioStep={messageScenarioStep}
               scenarioRunning={messageScenarioRunning}
               slot={targetSlot}
@@ -2840,7 +3135,23 @@ function AutomationsSection({ automations, setAutomations }) {
   );
 }
 
-function MessagesSection({ conversations, selected, setSelected, runLiveScenario, scenarioStep, scenarioRunning, slot }) {
+function MessagesSection({
+  conversations,
+  selected,
+  setSelected,
+  runLiveScenario,
+  triagePatient,
+  setTriagePatient,
+  triageMessage,
+  setTriageMessage,
+  messageUnderstanding,
+  messageExamples,
+  handleMessageExample,
+  handleIncomingClientMessage,
+  scenarioStep,
+  scenarioRunning,
+  slot,
+}) {
   const activeConversation = selected || conversations[0];
   const slotLabel = slot?.status || "confermato";
 
@@ -2883,6 +3194,70 @@ function MessagesSection({ conversations, selected, setSelected, runLiveScenario
           <span className="font-semibold text-slate-950">Slot monitorato:</span>
           <span>Lunedi 25 maggio, 16:00, igiene dentale</span>
           <span className={classNames("rounded-full border px-2.5 py-1 text-xs font-semibold", statusStyle(slotLabel))}>{slotLabel}</span>
+        </div>
+      </Panel>
+
+      <Panel className="mb-6 p-5">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950">Comprensione automatica messaggi</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+              Simula un messaggio libero: il sistema riconosce richiesta, paziente, dati utili e azione successiva.
+            </p>
+          </div>
+          <Badge tone="teal">AI operativa</Badge>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[220px_1fr]">
+              <select value={triagePatient} onChange={(event) => setTriagePatient(event.target.value)} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500">
+                {patients.map((patient) => <option key={patient.name}>{patient.name}</option>)}
+              </select>
+              <textarea
+                value={triageMessage}
+                onChange={(event) => setTriageMessage(event.target.value)}
+                className="min-h-[96px] rounded-md border border-slate-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-teal-500"
+                placeholder="Scrivi o modifica un messaggio del paziente"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {messageExamples.map((example) => (
+                <button
+                  key={example.label}
+                  type="button"
+                  onClick={() => handleMessageExample(example)}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
+                >
+                  {example.label}
+                </button>
+              ))}
+            </div>
+            <Button onClick={handleIncomingClientMessage}>Simula messaggio ricevuto</Button>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Analisi del sistema</div>
+            {messageUnderstanding ? (
+              <div className="mt-3 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={messageUnderstanding.tone}>{messageUnderstanding.intentLabel}</Badge>
+                  <Badge tone="slate">Confidenza {messageUnderstanding.confidence}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {messageUnderstanding.detected.map((item) => (
+                    <div key={item} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">{item}</div>
+                  ))}
+                </div>
+                <div className="rounded-md border border-teal-200 bg-white px-3 py-2">
+                  <div className="text-sm font-semibold text-slate-950">{messageUnderstanding.actionTitle}</div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">{messageUnderstanding.actionDetail}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm leading-6 text-slate-500">Scegli un esempio o scrivi un messaggio, poi avvia la simulazione.</p>
+            )}
+          </div>
         </div>
       </Panel>
 
