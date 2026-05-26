@@ -98,6 +98,7 @@ const todayAgendaDate = "2026-05-26";
 
 const agendaYear = 2026;
 const agendaMonthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+const agendaMonthShortNames = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
 const agendaMonthNamesLower = agendaMonthNames.map((month) => month.toLowerCase());
 const agendaWeekdayNames = ["Domenica", "Lunedi", "Martedi", "Mercoledi", "Giovedi", "Venerdi", "Sabato"];
 const agendaWeekdayShort = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
@@ -144,6 +145,7 @@ const monthDays = buildAgendaYearDays();
 const agendaMonths = agendaMonthNames.map((label, index) => ({
   key: `${agendaYear}-${pad2(index + 1)}`,
   label,
+  shortLabel: agendaMonthShortNames[index],
 }));
 
 const monthlyAgendaSlots = {
@@ -492,6 +494,22 @@ function EmptyLine({ children }) {
   return <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">{children}</div>;
 }
 
+function ScenarioOutcome({ title = "Riepilogo scenario", items }) {
+  return (
+    <Panel className="p-5">
+      <h3 className="font-bold text-slate-950">{title}</h3>
+      <div className="mt-4 space-y-3">
+        {items.map((item) => (
+          <div key={item.label} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</div>
+            <div className="mt-1 text-sm leading-6 text-slate-700">{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
 function ScenarioTimeline({ steps }) {
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
@@ -534,6 +552,46 @@ function NotificationCenter({ notifications, setActiveSection }) {
           </button>
         ))}
       </div>
+    </Panel>
+  );
+}
+
+function DemoPitchPanel({ startGuidedScenario, runDaySimulation }) {
+  return (
+    <Panel className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-bold text-slate-950">Percorso consigliato</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-500">Una demo chiara in pochi minuti.</p>
+        </div>
+        <Badge tone="teal">5-7 min</Badge>
+      </div>
+      <div className="mt-4 space-y-2">
+        <Button onClick={() => startGuidedScenario("rinuncia")} className="w-full">1. Fill the Gap</Button>
+        <Button onClick={() => startGuidedScenario("inattivo")} variant="secondary" className="w-full">2. Follow-up</Button>
+        <Button onClick={() => startGuidedScenario("preventivo")} variant="secondary" className="w-full">3. Preventivi</Button>
+      </div>
+      <button
+        type="button"
+        onClick={runDaySimulation}
+        className="mt-4 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-white"
+      >
+        Simula giornata completa
+      </button>
+      <button
+        type="button"
+        onClick={() => document.documentElement.requestFullscreen?.()}
+        className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-slate-50"
+      >
+        Modalita presentazione
+      </button>
+      <details className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-800">Racconta scenario</summary>
+        <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+          <p>Parti da una rinuncia reale, mostra la ricerca automatica e chiudi con l'agenda aggiornata.</p>
+          <p>Messaggio chiave: meno lavoro manuale, piu continuita operativa.</p>
+        </div>
+      </details>
     </Panel>
   );
 }
@@ -619,7 +677,10 @@ function GuidedDemoSection({ notifications, timelineSteps, startGuidedScenario, 
           </div>
         </Panel>
 
-        <NotificationCenter notifications={notifications} setActiveSection={setActiveSection} />
+        <div className="space-y-6">
+          <DemoPitchPanel startGuidedScenario={startGuidedScenario} runDaySimulation={runDaySimulation} />
+          <NotificationCenter notifications={notifications} setActiveSection={setActiveSection} />
+        </div>
       </div>
     </PageFrame>
   );
@@ -1550,15 +1611,17 @@ function AgendaSectionMonthly({
                   <button
                     key={month.key}
                     type="button"
+                    aria-label={month.label}
+                    title={month.label}
                     onClick={() => selectAgendaMonth(month.key)}
                     className={classNames(
-                      "rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                      "min-w-0 rounded-lg border px-2 py-2 text-center text-xs font-semibold transition",
                       selectedAgendaMonth === month.key
                         ? "border-teal-500 bg-teal-50 text-teal-800"
                         : "border-slate-200 bg-white text-slate-600 hover:border-teal-200 hover:bg-slate-50"
                     )}
                   >
-                    {month.label}
+                    {month.shortLabel}
                   </button>
                 ))}
               </div>
@@ -1620,7 +1683,7 @@ function AgendaSectionMonthly({
             ) : (
               <div className="divide-y divide-slate-100">
                 {selectedDaySlots.map((slot) => (
-                  <div key={slot.id || `${selectedAgendaDay}-${slot.time}-${slot.patient}-${slot.treatment}`} className={classNames("grid grid-cols-[90px_1fr_170px_150px] items-center gap-4 px-6 py-4 text-sm", slot.status === "da riempire" ? "bg-rose-50/70" : slot.status === "riempito" ? "bg-teal-50/80" : slot.manual ? "bg-slate-50" : "")}>
+                  <div key={slot.id || `${selectedAgendaDay}-${slot.time}-${slot.patient}-${slot.treatment}`} className={classNames("grid grid-cols-[90px_1fr_170px_150px] items-center gap-4 px-6 py-4 text-sm transition", slot.status === "da riempire" ? "bg-rose-50/70 ring-1 ring-inset ring-rose-200" : slot.status === "riempito" ? "bg-teal-50/80 ring-1 ring-inset ring-teal-200" : slot.manual ? "bg-slate-50" : "")}>
                     <div className="font-mono text-sm font-bold text-slate-600">{slot.time}</div>
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -1885,6 +1948,15 @@ function FillGapSection({ status, step, isSimulationRunning, log, slot, simulate
     <PageFrame title="Fill the Gap" subtitle="Simula il recupero operativo di uno slot lasciato libero: il sistema rileva la rinuncia, seleziona pazienti compatibili e aggiorna l'agenda quando arriva una conferma.">
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_420px]">
         <div className="space-y-6">
+          <ScenarioOutcome
+            title="Cosa evidenziare"
+            items={[
+              { label: "Evento", value: "Una rinuncia libera uno slot in agenda." },
+              { label: "Automazione", value: "Il sistema trova pazienti compatibili e invia i messaggi." },
+              { label: "Risultato", value: status === "filled" ? "Slot riempito e conversazione tracciata." : "Il titolare vede il processo mentre avanza." },
+            ]}
+          />
+
           <Panel className="p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
@@ -1983,6 +2055,15 @@ function FillGapSection({ status, step, isSimulationRunning, log, slot, simulate
         </div>
 
         <div className="space-y-6">
+          <ScenarioOutcome
+            title="Causa-effetto"
+            items={[
+              { label: "Evento", value: hasDetectedSlot ? "Rinuncia o slot libero rilevato." : "Slot ancora confermato." },
+              { label: "Automazione", value: currentStep >= 5 ? "Messaggi inviati sui canali preferiti." : "Ricerca pazienti pronta." },
+              { label: "Risultato", value: status === "filled" ? "Agenda aggiornata con Maria Rossi." : "In attesa della conferma." },
+            ]}
+          />
+
           <Panel className="p-6">
             <h3 className="font-bold text-slate-950">Risposte simulate</h3>
             <div className="mt-4 space-y-3">
@@ -2093,6 +2174,15 @@ function FollowUpSection({ active, queue, log, activateFollowup }) {
           </Panel>
 
           <div className="space-y-6">
+            <ScenarioOutcome
+              title="Riepilogo operativo"
+              items={[
+                { label: "Evento", value: "Paziente vicino alla scadenza igiene." },
+                { label: "Automazione", value: active ? "Richiamo automatico inviato o programmato." : "Regola pronta da attivare." },
+                { label: "Risultato", value: active ? "Coda follow-up aggiornata senza promemoria manuali." : "Lo scenario mostra cosa succede dopo l'attivazione." },
+              ]}
+            />
+
             <Panel className="p-6">
               <h2 className="font-bold text-slate-950">Builder automazione</h2>
               <div className="mt-5 space-y-4">
@@ -2459,6 +2549,15 @@ function QuotesSection({ quotes, selectedQuote, selectQuote, filter, setFilter, 
         </Panel>
 
         <div className="space-y-6">
+          <ScenarioOutcome
+            title="Riepilogo operativo"
+            items={[
+              { label: "Evento", value: "Preventivo inviato e non ancora confermato." },
+              { label: "Automazione", value: automationStatus === "idle" ? "Sequenza pronta: giorno 3, 7 e 14." : "Follow-up automatico in corso." },
+              { label: "Risultato", value: automationStatus === "complete" ? "Risposta registrata e prossima azione chiara." : "Lo studio non perde il contatto dopo l'invio." },
+            ]}
+          />
+
           <Panel className="p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
