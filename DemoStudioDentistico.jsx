@@ -94,40 +94,57 @@ const initialSlots = [
 const demoAgendaDate = "2026-05-25";
 const demoAgendaLabel = "Lunedi 25 maggio";
 const demoSlotTime = "16:00";
+const todayAgendaDate = "2026-05-26";
 
-const monthDays = [
-  { key: "2026-05-01", day: 1, weekday: "Ven", label: "Venerdi 1 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
-  { key: "2026-05-02", day: 2, weekday: "Sab", label: "Sabato 2 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
-  { key: "2026-05-03", day: 3, weekday: "Dom", label: "Domenica 3 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
-  { key: "2026-05-04", day: 4, weekday: "Lun", label: "Lunedi 4 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
-  { key: "2026-05-05", day: 5, weekday: "Mar", label: "Martedi 5 maggio", closed: false, summary: "7 appuntamenti", tone: "teal" },
-  { key: "2026-05-06", day: 6, weekday: "Mer", label: "Mercoledi 6 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
-  { key: "2026-05-07", day: 7, weekday: "Gio", label: "Giovedi 7 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
-  { key: "2026-05-08", day: 8, weekday: "Ven", label: "Venerdi 8 maggio", closed: false, summary: "4 appuntamenti", tone: "slate" },
-  { key: "2026-05-09", day: 9, weekday: "Sab", label: "Sabato 9 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
-  { key: "2026-05-10", day: 10, weekday: "Dom", label: "Domenica 10 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
-  { key: "2026-05-11", day: 11, weekday: "Lun", label: "Lunedi 11 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
-  { key: "2026-05-12", day: 12, weekday: "Mar", label: "Martedi 12 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
-  { key: "2026-05-13", day: 13, weekday: "Mer", label: "Mercoledi 13 maggio", closed: false, summary: "7 appuntamenti", tone: "teal" },
-  { key: "2026-05-14", day: 14, weekday: "Gio", label: "Giovedi 14 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
-  { key: "2026-05-15", day: 15, weekday: "Ven", label: "Venerdi 15 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
-  { key: "2026-05-16", day: 16, weekday: "Sab", label: "Sabato 16 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
-  { key: "2026-05-17", day: 17, weekday: "Dom", label: "Domenica 17 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
-  { key: "2026-05-18", day: 18, weekday: "Lun", label: "Lunedi 18 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
-  { key: "2026-05-19", day: 19, weekday: "Mar", label: "Martedi 19 maggio", closed: false, summary: "4 appuntamenti", tone: "slate" },
-  { key: "2026-05-20", day: 20, weekday: "Mer", label: "Mercoledi 20 maggio", closed: false, summary: "7 appuntamenti", tone: "teal" },
-  { key: "2026-05-21", day: 21, weekday: "Gio", label: "Giovedi 21 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
-  { key: "2026-05-22", day: 22, weekday: "Ven", label: "Venerdi 22 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
-  { key: "2026-05-23", day: 23, weekday: "Sab", label: "Sabato 23 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
-  { key: "2026-05-24", day: 24, weekday: "Dom", label: "Domenica 24 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
-  { key: demoAgendaDate, day: 25, weekday: "Lun", label: demoAgendaLabel, closed: false, summary: "Scenario Fill the Gap", tone: "amber" },
-  { key: "2026-05-26", day: 26, weekday: "Mar", label: "Martedi 26 maggio", closed: false, summary: "7 appuntamenti", tone: "teal" },
-  { key: "2026-05-27", day: 27, weekday: "Mer", label: "Mercoledi 27 maggio", closed: false, summary: "6 appuntamenti", tone: "teal" },
-  { key: "2026-05-28", day: 28, weekday: "Gio", label: "Giovedi 28 maggio", closed: false, summary: "4 appuntamenti", tone: "slate" },
-  { key: "2026-05-29", day: 29, weekday: "Ven", label: "Venerdi 29 maggio", closed: false, summary: "5 appuntamenti", tone: "slate" },
-  { key: "2026-05-30", day: 30, weekday: "Sab", label: "Sabato 30 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
-  { key: "2026-05-31", day: 31, weekday: "Dom", label: "Domenica 31 maggio", closed: true, summary: "Studio chiuso", tone: "slate" },
-];
+const agendaYear = 2026;
+const agendaMonthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+const agendaMonthNamesLower = agendaMonthNames.map((month) => month.toLowerCase());
+const agendaWeekdayNames = ["Domenica", "Lunedi", "Martedi", "Mercoledi", "Giovedi", "Venerdi", "Sabato"];
+const agendaWeekdayShort = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+
+function pad2(value) {
+  return String(value).padStart(2, "0");
+}
+
+function formatAgendaDateKey(year, monthIndex, day) {
+  return `${year}-${pad2(monthIndex + 1)}-${pad2(day)}`;
+}
+
+function buildAgendaYearDays(year = agendaYear) {
+  const days = [];
+
+  for (let monthIndex = 0; monthIndex < 12; monthIndex += 1) {
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(year, monthIndex, day);
+      const weekdayIndex = date.getDay();
+      const closed = weekdayIndex === 0 || weekdayIndex === 6;
+      const key = formatAgendaDateKey(year, monthIndex, day);
+      const appointmentCount = 4 + ((day + monthIndex) % 4);
+
+      days.push({
+        key,
+        monthKey: `${year}-${pad2(monthIndex + 1)}`,
+        monthIndex,
+        day,
+        weekday: agendaWeekdayShort[weekdayIndex],
+        weekdayIndex: (weekdayIndex + 6) % 7,
+        label: `${agendaWeekdayNames[weekdayIndex]} ${day} ${agendaMonthNamesLower[monthIndex]}`,
+        closed,
+        summary: key === demoAgendaDate ? "Scenario Fill the Gap" : closed ? "Studio chiuso" : `${appointmentCount} appuntamenti`,
+        tone: key === demoAgendaDate ? "amber" : closed ? "slate" : (day + monthIndex) % 3 === 0 ? "teal" : "slate",
+      });
+    }
+  }
+
+  return days;
+}
+
+const monthDays = buildAgendaYearDays();
+const agendaMonths = agendaMonthNames.map((label, index) => ({
+  key: `${agendaYear}-${pad2(index + 1)}`,
+  label,
+}));
 
 const monthlyAgendaSlots = {
   "2026-05-01": [
@@ -186,14 +203,19 @@ function buildDefaultSlots(day) {
   const names = ["Maria Rossi", "Luca Bianchi", "Sara Colombo", "Elena Conti", "Marco Riva", "Giulia Ferri", "Antonio Greco"];
   const treatments = ["Igiene dentale", "Controllo", "Visita di controllo", "Ortodonzia", "Sbiancamento", "Controllo post-intervento"];
   const channels = ["WhatsApp", "SMS", "Email", "Telefonata"];
-  const index = day.day;
+  const index = day.day + (day.monthIndex || 0);
+  const isPastDay = day.key < todayAgendaDate;
   return [
-    { time: "09:00", patient: names[index % names.length], treatment: treatments[index % treatments.length], status: index < 23 ? "completato" : "confermato", channel: channels[index % channels.length] },
-    { time: "10:30", patient: names[(index + 2) % names.length], treatment: treatments[(index + 1) % treatments.length], status: index < 23 ? "completato" : "confermato", channel: channels[(index + 1) % channels.length] },
+    { time: "09:00", patient: names[index % names.length], treatment: treatments[index % treatments.length], status: isPastDay ? "completato" : "confermato", channel: channels[index % channels.length] },
+    { time: "10:30", patient: names[(index + 2) % names.length], treatment: treatments[(index + 1) % treatments.length], status: isPastDay ? "completato" : "confermato", channel: channels[(index + 1) % channels.length] },
     { time: "12:00", patient: "Slot libero", treatment: "Disponibile per urgenze", status: "libero", channel: "-" },
     { time: "15:00", patient: names[(index + 4) % names.length], treatment: treatments[(index + 3) % treatments.length], status: index % 9 === 0 ? "a rischio" : "confermato", channel: channels[(index + 2) % channels.length] },
     { time: "17:30", patient: names[(index + 5) % names.length], treatment: treatments[(index + 4) % treatments.length], status: "confermato", channel: channels[(index + 3) % channels.length] },
   ];
+}
+
+function sortSlotsByTime(slots) {
+  return [...slots].sort((first, second) => first.time.localeCompare(second.time));
 }
 
 const patients = [
@@ -606,6 +628,7 @@ function GuidedDemoSection({ notifications, timelineSteps, startGuidedScenario, 
 function DemoStudioDentisticoApp() {
   const [activeSection, setActiveSection] = useState("home");
   const [slots, setSlots] = useState(initialSlots);
+  const [manualAppointments, setManualAppointments] = useState({});
   const [selectedAgendaDay, setSelectedAgendaDay] = useState(demoAgendaDate);
   const [gapStatus, setGapStatus] = useState("idle");
   const [gapStep, setGapStep] = useState(0);
@@ -657,10 +680,17 @@ function DemoStudioDentisticoApp() {
   const activeLabel = sections.find((section) => section.id === activeSection)?.label || "Home";
   const targetSlot = slots.find((slot) => slot.time === "16:00");
   const selectedMonthDay = monthDays.find((day) => day.key === selectedAgendaDay) || monthDays.find((day) => day.key === demoAgendaDate);
-  const selectedDaySlots =
+  const selectedAgendaMonth = selectedAgendaDay.slice(0, 7);
+  const visibleMonthDays = monthDays.filter((day) => day.monthKey === selectedAgendaMonth);
+  const manualSlotsForDay = manualAppointments[selectedAgendaDay] || [];
+  const baseSelectedDaySlots =
     selectedAgendaDay === demoAgendaDate
       ? slots
       : monthlyAgendaSlots[selectedAgendaDay] || buildDefaultSlots(selectedMonthDay);
+  const selectedDaySlots =
+    selectedMonthDay?.closed
+      ? manualSlotsForDay
+      : sortSlotsByTime([...baseSelectedDaySlots, ...manualSlotsForDay]);
 
   useEffect(() => {
     const scrollArea = document.querySelector("[data-app-scroll]");
@@ -811,6 +841,32 @@ function DemoStudioDentisticoApp() {
 
   function pushNotification(notification) {
     setNotifications((current) => [notification, ...current.filter((item) => item.title !== notification.title)].slice(0, 6));
+  }
+
+  function selectAgendaMonth(monthKey) {
+    const firstOpenDay = monthDays.find((day) => day.monthKey === monthKey && !day.closed);
+    const firstDay = monthDays.find((day) => day.monthKey === monthKey);
+    setSelectedAgendaDay((firstOpenDay || firstDay || selectedMonthDay)?.key || demoAgendaDate);
+  }
+
+  function addManualAppointment(dayKey, appointment) {
+    const nextAppointment = {
+      ...appointment,
+      id: `manual-${dayKey}-${Date.now()}`,
+      manual: true,
+    };
+
+    setManualAppointments((current) => ({
+      ...current,
+      [dayKey]: sortSlotsByTime([...(current[dayKey] || []), nextAppointment]),
+    }));
+
+    pushNotification({
+      title: "Appuntamento inserito",
+      detail: `${appointment.patient} aggiunto in agenda alle ${appointment.time}.`,
+      target: "agenda",
+      tone: "teal",
+    });
   }
 
   function openDemoSlot() {
@@ -1346,7 +1402,11 @@ function DemoStudioDentisticoApp() {
           )}
           {activeSection === "agenda" && (
             <AgendaSectionMonthly
-              monthDays={monthDays}
+              agendaMonths={agendaMonths}
+              selectedAgendaMonth={selectedAgendaMonth}
+              selectAgendaMonth={selectAgendaMonth}
+              monthDays={visibleMonthDays}
+              manualAppointments={manualAppointments}
               selectedAgendaDay={selectedAgendaDay}
               setSelectedAgendaDay={setSelectedAgendaDay}
               selectedMonthDay={selectedMonthDay}
@@ -1354,6 +1414,7 @@ function DemoStudioDentisticoApp() {
               targetSlot={targetSlot}
               simulateCancellation={simulateCancellation}
               resetScenario={resetScenario}
+              addManualAppointment={addManualAppointment}
               setActiveSection={setActiveSection}
             />
           )}
@@ -1413,7 +1474,11 @@ function DemoStudioDentisticoApp() {
 }
 
 function AgendaSectionMonthly({
+  agendaMonths,
+  selectedAgendaMonth,
+  selectAgendaMonth,
   monthDays,
+  manualAppointments,
   selectedAgendaDay,
   setSelectedAgendaDay,
   selectedMonthDay,
@@ -1421,24 +1486,81 @@ function AgendaSectionMonthly({
   targetSlot,
   simulateCancellation,
   resetScenario,
+  addManualAppointment,
   setActiveSection,
 }) {
+  const [appointmentForm, setAppointmentForm] = useState({
+    time: "09:00",
+    patient: "",
+    treatment: "Igiene dentale",
+    channel: "WhatsApp",
+    status: "confermato",
+  });
   const weekLabels = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
-  const leadingEmptyDays = 4;
+  const leadingEmptyDays = monthDays[0]?.weekdayIndex || 0;
+  const selectedMonthLabel = agendaMonths.find((month) => month.key === selectedAgendaMonth)?.label || "Mese";
+  const selectedDayManualCount = (manualAppointments[selectedAgendaDay] || []).length;
+
+  function updateAppointmentForm(field, value) {
+    setAppointmentForm((current) => ({ ...current, [field]: value }));
+  }
+
+  function submitManualAppointment(event) {
+    event.preventDefault();
+    if (selectedMonthDay?.closed) return;
+
+    const patient = appointmentForm.patient.trim();
+    const treatment = appointmentForm.treatment.trim();
+    if (!patient || !treatment) return;
+
+    addManualAppointment(selectedAgendaDay, {
+      time: appointmentForm.time,
+      patient,
+      treatment,
+      channel: appointmentForm.channel,
+      status: appointmentForm.status,
+    });
+    setAppointmentForm((current) => ({
+      ...current,
+      patient: "",
+      treatment: "Igiene dentale",
+      status: "confermato",
+    }));
+  }
 
   return (
-    <PageFrame title="Agenda operativa" subtitle="Vista mensile dello studio con dettaglio giornaliero. Il caso Fill the Gap resta evidenziato sul lunedi 25 maggio alle 16:00.">
+    <PageFrame title="Agenda operativa" subtitle="Vista annuale dello studio con dettaglio giornaliero. Puoi navigare tutti i mesi del 2026 e inserire manualmente nuovi appuntamenti.">
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
         <div className="space-y-6">
           <Panel className="overflow-hidden">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
               <div>
-                <h2 className="font-bold text-slate-950">Maggio 2026</h2>
-                <p className="mt-1 text-sm text-slate-500">Calendario completo del mese. Clicca una data per vedere gli slot della giornata.</p>
+                <h2 className="font-bold text-slate-950">{selectedMonthLabel} 2026</h2>
+                <p className="mt-1 text-sm text-slate-500">Seleziona un mese, poi clicca una data per vedere o aggiungere appuntamenti.</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button onClick={simulateCancellation} variant="primary">Simula rinuncia appuntamento</Button>
                 <Button onClick={resetScenario} variant="secondary">Ripristina scenario</Button>
+              </div>
+            </div>
+
+            <div className="border-b border-slate-100 px-6 py-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6 xl:grid-cols-12">
+                {agendaMonths.map((month) => (
+                  <button
+                    key={month.key}
+                    type="button"
+                    onClick={() => selectAgendaMonth(month.key)}
+                    className={classNames(
+                      "rounded-lg border px-3 py-2 text-sm font-semibold transition",
+                      selectedAgendaMonth === month.key
+                        ? "border-teal-500 bg-teal-50 text-teal-800"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-teal-200 hover:bg-slate-50"
+                    )}
+                  >
+                    {month.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -1468,7 +1590,9 @@ function AgendaSectionMonthly({
                       <span className={classNames("text-sm font-bold", selectedAgendaDay === day.key ? "text-teal-800" : "text-slate-900")}>{day.day}</span>
                       <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">{day.weekday}</span>
                     </div>
-                    <div className={classNames("mt-3 text-xs leading-5", day.closed ? "text-slate-400" : selectedAgendaDay === day.key ? "text-teal-700" : "text-slate-500")}>{day.summary}</div>
+                    <div className={classNames("mt-3 text-xs leading-5", day.closed ? "text-slate-400" : selectedAgendaDay === day.key ? "text-teal-700" : "text-slate-500")}>
+                      {manualAppointments[day.key]?.length ? `${manualAppointments[day.key].length} inseriti manualmente` : day.summary}
+                    </div>
                     {day.key === demoAgendaDate && <div className="mt-2 h-1.5 w-10 rounded-full bg-amber-500" />}
                   </button>
                 ))}
@@ -1496,10 +1620,13 @@ function AgendaSectionMonthly({
             ) : (
               <div className="divide-y divide-slate-100">
                 {selectedDaySlots.map((slot) => (
-                  <div key={`${selectedAgendaDay}-${slot.time}`} className={classNames("grid grid-cols-[90px_1fr_170px_150px] items-center gap-4 px-6 py-4 text-sm", slot.status === "da riempire" ? "bg-rose-50/70" : slot.status === "riempito" ? "bg-teal-50/80" : "")}>
+                  <div key={slot.id || `${selectedAgendaDay}-${slot.time}-${slot.patient}-${slot.treatment}`} className={classNames("grid grid-cols-[90px_1fr_170px_150px] items-center gap-4 px-6 py-4 text-sm", slot.status === "da riempire" ? "bg-rose-50/70" : slot.status === "riempito" ? "bg-teal-50/80" : slot.manual ? "bg-slate-50" : "")}>
                     <div className="font-mono text-sm font-bold text-slate-600">{slot.time}</div>
                     <div>
-                      <div className="font-semibold text-slate-950">{slot.patient}</div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-slate-950">{slot.patient}</span>
+                        {slot.manual && <Badge tone="slate">manuale</Badge>}
+                      </div>
                       <div className="mt-0.5 text-slate-500">{slot.treatment}</div>
                     </div>
                     <div className="text-slate-500">{slot.channel}</div>
@@ -1514,6 +1641,90 @@ function AgendaSectionMonthly({
         </div>
 
         <div className="space-y-6">
+          <Panel className="p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-bold text-slate-950">Inserisci appuntamento</h3>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  Aggiungi un nuovo slot per {selectedMonthDay?.label}.
+                </p>
+              </div>
+              {selectedDayManualCount > 0 && <Badge tone="teal">{selectedDayManualCount} manuali</Badge>}
+            </div>
+
+            <form onSubmit={submitManualAppointment} className="mt-5 space-y-4">
+              <label className="block text-sm font-semibold text-slate-700">
+                Orario
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={appointmentForm.time}
+                  onChange={(event) => updateAppointmentForm("time", event.target.value)}
+                  placeholder="09:00"
+                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-teal-500"
+                  required
+                />
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Paziente
+                <input
+                  value={appointmentForm.patient}
+                  onChange={(event) => updateAppointmentForm("patient", event.target.value)}
+                  placeholder="Es. Sara Colombo"
+                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-teal-500"
+                  required
+                />
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Trattamento
+                <select
+                  value={appointmentForm.treatment}
+                  onChange={(event) => updateAppointmentForm("treatment", event.target.value)}
+                  className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-teal-500"
+                >
+                  <option>Igiene dentale</option>
+                  <option>Visita di controllo</option>
+                  <option>Sbiancamento</option>
+                  <option>Implantologia</option>
+                  <option>Ortodonzia</option>
+                  <option>Devitalizzazione</option>
+                  <option>Visita bambini</option>
+                </select>
+              </label>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block text-sm font-semibold text-slate-700">
+                  Canale
+                  <select
+                    value={appointmentForm.channel}
+                    onChange={(event) => updateAppointmentForm("channel", event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-teal-500"
+                  >
+                    <option>WhatsApp</option>
+                    <option>SMS</option>
+                    <option>Email</option>
+                    <option>Telefonata</option>
+                  </select>
+                </label>
+                <label className="block text-sm font-semibold text-slate-700">
+                  Stato
+                  <select
+                    value={appointmentForm.status}
+                    onChange={(event) => updateAppointmentForm("status", event.target.value)}
+                    className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-teal-500"
+                  >
+                    <option value="confermato">confermato</option>
+                    <option value="a rischio">a rischio</option>
+                    <option value="completato">completato</option>
+                    <option value="libero">libero</option>
+                  </select>
+                </label>
+              </div>
+              <Button type="submit" className="w-full" disabled={selectedMonthDay?.closed}>
+                {selectedMonthDay?.closed ? "Studio chiuso" : "Aggiungi appuntamento"}
+              </Button>
+            </form>
+          </Panel>
+
           <Panel className="p-6">
             <h3 className="font-bold text-slate-950">Scenario demo</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600">
