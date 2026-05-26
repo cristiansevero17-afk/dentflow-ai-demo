@@ -47,11 +47,11 @@ const fillGapSteps = [
   },
   {
     title: "Ricerca pazienti compatibili",
-    detail: "Il sistema controlla lista d'attesa, preferenze, prossimita e consenso.",
+    detail: "Il sistema controlla lista d'attesa, preferenze, prossimita' e consenso.",
   },
   {
     title: "Classifica suggerimenti",
-    detail: "I pazienti vengono ordinati per probabilita e coerenza con lo slot.",
+    detail: "I pazienti vengono ordinati per probabilita' e coerenza con lo slot.",
   },
   {
     title: "Messaggi automatici",
@@ -74,7 +74,7 @@ const fillGapSteps = [
 const initialNotifications = [
   { title: "Rinuncia possibile da gestire", detail: "Slot igiene del 25 maggio alle 16:00 pronto per simulare il Fill the Gap.", target: "agenda", tone: "amber" },
   { title: "Richiami igiene in scadenza", detail: "Sara Colombo e altri pazienti possono entrare nel follow-up automatico.", target: "followup", tone: "teal" },
-  { title: "Preventivo da seguire", detail: "Elena Conti ha un preventivo aperto e puo ricevere una sequenza automatica.", target: "preventivi", tone: "slate" },
+  { title: "Preventivo da seguire", detail: "Elena Conti ha un preventivo aperto e puo' ricevere una sequenza automatica.", target: "preventivi", tone: "slate" },
 ];
 
 const whatsappLocalServerUrl = "http://localhost:8787";
@@ -231,7 +231,7 @@ const patients = [
     preferredChannel: "WhatsApp",
     treatments: "Igiene, controllo periodico",
     suggested: "Richiamo igiene",
-    badges: ["Lista d'attesa", "Alta compatibilita", "Consenso attivo"],
+    badges: ["Lista d'attesa", "Alta compatibilita'", "Consenso attivo"],
     notes: "Preferisce appuntamenti nel tardo pomeriggio. Disponibile con poco preavviso.",
     timeline: [
       "Ha richiesto un appuntamento anticipato per igiene.",
@@ -264,8 +264,8 @@ const patients = [
     treatments: "Igiene, controllo gengive",
     suggested: "Prossimo richiamo igiene",
     badges: ["Follow-up attivo", "Consenso attivo"],
-    notes: "Chiede spesso disponibilita al mattino.",
-    timeline: ["Ha chiesto disponibilita per venerdi mattina.", "Messaggio follow-up letto."],
+    notes: "Chiede spesso disponibilita' al mattino.",
+    timeline: ["Ha chiesto disponibilita' per venerdi mattina.", "Messaggio follow-up letto."],
   },
   {
     name: "Elena Conti",
@@ -361,10 +361,21 @@ const candidateList = [
   { name: "Roberto Galli", reason: "Consenso comunicazioni non attivo", channel: "Email", fit: "Escluso", consent: false, response: "Non contattato." },
 ];
 
+const compatibilityFactors = [
+  "Trattamento compatibile con lo slot",
+  "Fascia oraria preferita",
+  "Consenso comunicazioni attivo",
+  "Canale rapido, ad esempio WhatsApp",
+  "Disponibilita' last-minute",
+  "Vicinanza allo studio",
+  "Probabilita' storica di risposta",
+  "Urgenza o lista d'attesa",
+];
+
 const quotes = [
   { name: "Elena Conti", treatment: "Trattamento implantare", sent: "12 giorni fa", status: "Chiarimento richiesto", probability: "Alta", last: "Messaggio letto", next: "Proporre chiamata con lo studio", timeline: ["Preventivo inviato dopo prima visita.", "Messaggio gentile inviato dopo alcuni giorni.", "La paziente chiede di parlare con il dottore."] },
   { name: "Roberto Galli", treatment: "Ortodonzia invisibile", sent: "5 giorni fa", status: "In valutazione", probability: "Media", last: "Email consegnata", next: "Reminder soft", timeline: ["Preventivo inviato via email.", "Nessuna risposta ancora registrata."] },
-  { name: "Paola Esposito", treatment: "Sbiancamento", sent: "20 giorni fa", status: "Da ricontattare", probability: "Media", last: "Nessuna risposta", next: "Messaggio con disponibilita", timeline: ["Preventivo inviato.", "Reminder non ancora aperto."] },
+  { name: "Paola Esposito", treatment: "Sbiancamento", sent: "20 giorni fa", status: "Da ricontattare", probability: "Media", last: "Nessuna risposta", next: "Messaggio con disponibilita'", timeline: ["Preventivo inviato.", "Reminder non ancora aperto."] },
   { name: "Marco Riva", treatment: "Devitalizzazione", sent: "3 giorni fa", status: "Domande aperte", probability: "Alta", last: "Risposta ricevuta", next: "Segnare domanda per il dottore", timeline: ["Ha chiesto chiarimenti sulla procedura.", "La segreteria deve preparare risposta."] },
 ];
 
@@ -396,10 +407,10 @@ const initialConversations = [
     name: "Sara Colombo",
     channel: "WhatsApp",
     status: "Risposto",
-    preview: "Avete disponibilita venerdi mattina?",
+    preview: "Avete disponibilita' venerdi mattina?",
     messages: [
-      { from: "Studio", text: "Ciao Sara, sono passati circa 6 mesi dalla tua ultima igiene dentale. Vuoi che ti proponiamo qualche disponibilita?" },
-      { from: "Sara", text: "Avete disponibilita venerdi mattina?" },
+      { from: "Studio", text: "Ciao Sara, sono passati circa 6 mesi dalla tua ultima igiene dentale. Vuoi che ti proponiamo qualche disponibilita'?" },
+      { from: "Sara", text: "Avete disponibilita' venerdi mattina?" },
     ],
   },
   {
@@ -583,7 +594,7 @@ function DemoPitchPanel({ startGuidedScenario, runDaySimulation }) {
         onClick={() => document.documentElement.requestFullscreen?.()}
         className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-teal-200 hover:bg-slate-50"
       >
-        Modalita presentazione
+        Modalita' presentazione
       </button>
       <details className="mt-4 rounded-lg border border-slate-200 bg-white p-3">
         <summary className="cursor-pointer text-sm font-semibold text-slate-800">Racconta scenario</summary>
@@ -886,7 +897,7 @@ function DemoStudioDentisticoApp() {
       preview: "Devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00.",
       messages: [
         { from: "Giulia", text: "Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace." },
-        { from: "Studio", text: "Grazie per averci avvisato. Ti proponiamo nuove disponibilita appena possibile." },
+        { from: "Studio", text: "Grazie per averci avvisato. Ti proponiamo nuove disponibilita' appena possibile." },
       ],
     });
     setActiveSection("fillgap");
@@ -941,7 +952,7 @@ function DemoStudioDentisticoApp() {
     setGapStatus("detected");
   }
 
-  function recordCancellationConversation(studioText = "Grazie per averci avvisato. Ti proponiamo nuove disponibilita appena possibile.") {
+  function recordCancellationConversation(studioText = "Grazie per averci avvisato. Ti proponiamo nuove disponibilita' appena possibile.") {
     addOrUpdateConversation({
       id: "giulia-rinuncia",
       name: "Giulia Ferri",
@@ -1027,7 +1038,7 @@ function DemoStudioDentisticoApp() {
       });
     } else {
       setGapStep(Math.max(gapStep, 2));
-      setGapLog((current) => current.length ? current : ["Slot libero gia rilevato: il sistema puo avviare la ricerca dei pazienti compatibili."]);
+      setGapLog((current) => current.length ? current : ["Slot libero gia' rilevato: il sistema puo' avviare la ricerca dei pazienti compatibili."]);
     }
 
     const offset = alreadyDetected ? 0 : 650;
@@ -1072,7 +1083,7 @@ function DemoStudioDentisticoApp() {
       setGapSimulationRunning(false);
       setGapLog((current) => [
         "Esito finale: slot recuperato senza chiamate manuali della segreteria.",
-        "La segreteria vede il risultato gia registrato in agenda e nei messaggi.",
+        "La segreteria vede il risultato gia' registrato in agenda e nei messaggi.",
         ...current,
       ]);
     });
@@ -1139,7 +1150,7 @@ function DemoStudioDentisticoApp() {
     });
 
     setTimeout(() => {
-      setQuoteAutomationLog((current) => ["Giorno 7: reminder automatico inviato con disponibilita per chiarimenti.", ...current]);
+      setQuoteAutomationLog((current) => ["Giorno 7: reminder automatico inviato con disponibilita' per chiarimenti.", ...current]);
       patchQuote(
         targetQuote,
         { last: "Reminder giorno 7 inviato", next: "Proposta chiamata giorno 14" },
@@ -1229,7 +1240,7 @@ function DemoStudioDentisticoApp() {
     setWhatsappEvents((events) => ["QR demo generato. In attesa di collegamento con il dispositivo dello studio.", ...events]);
     setTimeout(() => {
       setWhatsappStatus("connected");
-      setWhatsappEvents((events) => ["Collegamento WhatsApp demo completato. La postazione puo ricevere eventi in tempo reale.", ...events]);
+      setWhatsappEvents((events) => ["Collegamento WhatsApp demo completato. La postazione puo' ricevere eventi in tempo reale.", ...events]);
     }, 1000);
   }
 
@@ -1245,7 +1256,7 @@ function DemoStudioDentisticoApp() {
       preview: "Devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00.",
       messages: [
         { from: "Giulia", text: "Buongiorno, devo rinunciare all'appuntamento di lunedi 25 maggio alle 16:00. Mi dispiace." },
-        { from: "Studio", text: "Grazie per averci avvisato. Ti proponiamo nuove disponibilita appena possibile." },
+        { from: "Studio", text: "Grazie per averci avvisato. Ti proponiamo nuove disponibilita' appena possibile." },
       ],
     });
   }
@@ -1303,7 +1314,7 @@ function DemoStudioDentisticoApp() {
       preview: messageText,
       messages: [
         { from: contactName, text: messageText },
-        { from: "Studio", text: "Grazie per averci avvisato. Ti proponiamo nuove disponibilita appena possibile." },
+        { from: "Studio", text: "Grazie per averci avvisato. Ti proponiamo nuove disponibilita' appena possibile." },
       ],
     });
     setActiveSection("fillgap");
@@ -1384,7 +1395,7 @@ function DemoStudioDentisticoApp() {
       return [
         { label: "Preventivo aperto", detail: "Trattamento inviato e non ancora confermato.", done: quoteAutomationStatus !== "idle", active: quoteAutomationStatus === "idle" },
         { label: "Messaggio giorno 3", detail: "Contatto gentile automatico.", done: quoteAutomationStatus !== "idle", active: quoteAutomationStatus === "running" },
-        { label: "Reminder giorno 7", detail: "Disponibilita per chiarimenti.", done: quoteAutomationStatus !== "idle", active: quoteAutomationStatus === "running" },
+        { label: "Reminder giorno 7", detail: "Disponibilita' per chiarimenti.", done: quoteAutomationStatus !== "idle", active: quoteAutomationStatus === "running" },
         { label: "Risposta o call", detail: "Il sistema registra la risposta nei messaggi.", done: quoteAutomationStatus === "complete", active: quoteAutomationStatus === "running" },
       ];
     }
@@ -2048,7 +2059,7 @@ function FillGapSection({ status, step, isSimulationRunning, log, slot, simulate
               Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te.
             </div>
             <p className="mt-3 text-xs leading-5 text-slate-500">
-              Invio solo a pazienti con consenso comunicazioni attivo. Ogni messaggio puo includere indicazioni per non ricevere ulteriori comunicazioni non necessarie.
+              Invio solo a pazienti con consenso comunicazioni attivo. Ogni messaggio puo' includere indicazioni per non ricevere ulteriori comunicazioni non necessarie.
             </p>
             <FillGapMessageStates step={currentStep} />
           </Panel>
@@ -2081,7 +2092,7 @@ function FillGapSection({ status, step, isSimulationRunning, log, slot, simulate
             <h3 className="font-bold text-slate-950">Esito operativo</h3>
             {status === "filled" && currentStep >= 8 ? (
               <div className="mt-4 rounded-lg border border-teal-200 bg-teal-50 p-4 text-sm leading-6 text-teal-800">
-                Maria Rossi ha confermato. Lo slot di lunedi 25 maggio alle 16:00 risulta aggiornato in agenda e la segreteria puo proseguire senza chiamate manuali.
+                Maria Rossi ha confermato. Lo slot di lunedi 25 maggio alle 16:00 risulta aggiornato in agenda e la segreteria puo' proseguire senza chiamate manuali.
               </div>
             ) : (
               <div className="mt-4 text-sm leading-6 text-slate-600">
@@ -2192,7 +2203,7 @@ function FollowUpSection({ active, queue, log, activateFollowup }) {
                 <div>
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Messaggio</label>
                   <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-                    Ciao Sara, sono passati circa 6 mesi dalla tua ultima igiene dentale. Ti consigliamo di prenotare un controllo per mantenere denti e gengive in salute. Vuoi che ti proponiamo qualche disponibilita?
+                    Ciao Sara, sono passati circa 6 mesi dalla tua ultima igiene dentale. Ti consigliamo di prenotare un controllo per mantenere denti e gengive in salute. Vuoi che ti proponiamo qualche disponibilita'?
                   </div>
                 </div>
                 <Badge tone={active ? "teal" : "slate"}>{active ? "Automazione attiva" : "Automazione in bozza"}</Badge>
@@ -2362,7 +2373,7 @@ function PatientsSection({ patients, selectedPatient, setSelectedPatient, filter
                 <PatientInput label="Badge" value={draft.badges} onChange={(value) => updateDraft("badges", value)} placeholder="Consenso attivo, Follow-up attivo" />
               </div>
               <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <PatientTextArea label="Note" value={draft.notes} onChange={(value) => updateDraft("notes", value)} placeholder="Preferenze, disponibilita, indicazioni operative." />
+                <PatientTextArea label="Note" value={draft.notes} onChange={(value) => updateDraft("notes", value)} placeholder="Preferenze, disponibilita', indicazioni operative." />
                 <PatientTextArea label="Prima nota timeline" value={draft.timeline} onChange={(value) => updateDraft("timeline", value)} placeholder="Es. Paziente interessato a igiene nel tardo pomeriggio." />
               </div>
               <label className="mt-4 flex items-center gap-3 text-sm font-semibold text-slate-700">
@@ -2414,7 +2425,7 @@ function patientRecommendation(patient) {
     return "Consenso non attivo: usare solo comunicazioni operative o contatto manuale quando necessario.";
   }
   if (patient.badges.some((badge) => badge.toLowerCase().includes("preventivo"))) {
-    return `Avviare follow-up preventivo su ${patient.preferredChannel}: il paziente ha un trattamento aperto e una prossima azione gia suggerita.`;
+    return `Avviare follow-up preventivo su ${patient.preferredChannel}: il paziente ha un trattamento aperto e una prossima azione gia' suggerita.`;
   }
   if (patient.badges.some((badge) => badge.toLowerCase().includes("inattivo"))) {
     return `Avviare recupero paziente inattivo su ${patient.preferredChannel}: non risultano visite recenti e il consenso e attivo.`;
@@ -2465,46 +2476,66 @@ function PatientDetail({ patient }) {
 
 function WaitlistSection({ items, filter, setFilter, setActiveSection }) {
   return (
-    <PageFrame title="Lista d'attesa" subtitle="La lista d'attesa alimenta il Fill the Gap: lo staff vede chi puo essere contattato, con quale canale e in quale fascia oraria.">
-      <Panel className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
-          <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500">
-            <option>Tutti</option>
-            <option>Igiene dentale</option>
-            <option>WhatsApp</option>
-            <option>Alta</option>
-          </select>
-          <Button onClick={() => setActiveSection("fillgap")} variant="secondary">Usa nel Fill the Gap</Button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-6 py-3">Paziente</th>
-                <th className="px-6 py-3">Trattamento</th>
-                <th className="px-6 py-3">Fascia preferita</th>
-                <th className="px-6 py-3">Urgenza</th>
-                <th className="px-6 py-3">Last-minute</th>
-                <th className="px-6 py-3">Canale</th>
-                <th className="px-6 py-3">Compatibilita</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {items.map((item) => (
-                <tr key={item.name} className="bg-white">
-                  <td className="px-6 py-4 font-semibold text-slate-950">{item.name}</td>
-                  <td className="px-6 py-4 text-slate-600">{item.treatment}</td>
-                  <td className="px-6 py-4 text-slate-600">{item.preference}</td>
-                  <td className="px-6 py-4"><Badge tone={item.urgency === "Alta" ? "amber" : "slate"}>{item.urgency}</Badge></td>
-                  <td className="px-6 py-4 text-slate-600">{item.lastMinute}</td>
-                  <td className="px-6 py-4 text-slate-600">{item.channel}</td>
-                  <td className="px-6 py-4"><Badge tone={item.consent ? "teal" : "rose"}>{item.fit}</Badge></td>
+    <PageFrame title="Lista d'attesa" subtitle="La lista d'attesa alimenta il Fill the Gap: lo staff vede chi puo' essere contattato, con quale canale e in quale fascia oraria.">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_360px]">
+        <Panel className="overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-5">
+            <select value={filter} onChange={(event) => setFilter(event.target.value)} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500">
+              <option>Tutti</option>
+              <option>Igiene dentale</option>
+              <option>WhatsApp</option>
+              <option>Alta</option>
+            </select>
+            <Button onClick={() => setActiveSection("fillgap")} variant="secondary">Usa nel Fill the Gap</Button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-6 py-3">Paziente</th>
+                  <th className="px-6 py-3">Trattamento</th>
+                  <th className="px-6 py-3">Fascia preferita</th>
+                  <th className="px-6 py-3">Urgenza</th>
+                  <th className="px-6 py-3">Last-minute</th>
+                  <th className="px-6 py-3">Canale</th>
+                  <th className="px-6 py-3">Compatibilita'</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {items.map((item) => (
+                  <tr key={item.name} className="bg-white">
+                    <td className="px-6 py-4 font-semibold text-slate-950">{item.name}</td>
+                    <td className="px-6 py-4 text-slate-600">{item.treatment}</td>
+                    <td className="px-6 py-4 text-slate-600">{item.preference}</td>
+                    <td className="px-6 py-4"><Badge tone={item.urgency === "Alta" ? "amber" : "slate"}>{item.urgency}</Badge></td>
+                    <td className="px-6 py-4 text-slate-600">{item.lastMinute}</td>
+                    <td className="px-6 py-4 text-slate-600">{item.channel}</td>
+                    <td className="px-6 py-4"><Badge tone={item.consent ? "teal" : "rose"}>{item.fit}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
+
+        <Panel className="p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-bold text-slate-950">Criteri compatibilita'</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">Il sistema ordina i pazienti usando questi segnali.</p>
+            </div>
+            <Badge tone="teal">Fill the Gap</Badge>
+          </div>
+          <div className="mt-5 grid grid-cols-1 gap-2">
+            {compatibilityFactors.map((factor) => (
+              <div key={factor} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">{factor}</div>
+            ))}
+          </div>
+          <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
+            Alta = combacia quasi tutto. Buona = adatto con qualche differenza. Media = contattabile ma meno prioritario.
+          </div>
+        </Panel>
+      </div>
     </PageFrame>
   );
 }
@@ -2768,7 +2799,7 @@ function WhatsAppSection({
               <div>
                 <h2 className="font-bold text-slate-950">QR paziente per aprire la chat</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Questo e il QR da far inquadrare a un paziente: apre WhatsApp direttamente nella chat dello studio con la rinuncia gia pronta.
+                  Questo e' il QR da far inquadrare a un paziente: apre WhatsApp direttamente nella chat dello studio con la rinuncia gia' pronta.
                 </p>
                 <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
                   Usa come numero target quello dello studio. Il QR va inquadrato da un altro WhatsApp: se lo scansioni con lo stesso account dello studio, WhatsApp apre una chat con te stesso.
