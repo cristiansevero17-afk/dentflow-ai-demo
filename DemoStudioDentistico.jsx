@@ -480,6 +480,8 @@ function normalizeMessageText(value) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\bnn\b/g, "non")
+    .replace(/\bn\b/g, "non")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -510,11 +512,13 @@ function extractMessageSignals(message) {
 function analyzeClientMessage(message, patientName) {
   const normalized = normalizeMessageText(message);
   const signals = extractMessageSignals(message);
-  const hasCancellation = includesAny(normalized, ["non posso", "non riesco", "rinunc", "annull", "disdett", "cancell", "non vengo", "impossibile venire"]);
-  const hasReschedule = includesAny(normalized, ["anticip", "spost", "cambiare", "cambio", "altro orario", "quell'orario", "quel orario", "posticip"]);
-  const hasAvailability = includesAny(normalized, ["posto libero", "disponibil", "avete un posto", "settimana prossima", "prenotare", "quando avete"]);
+  const hasAppointmentReference = includesAny(normalized, ["appuntamento", "visita", "igiene", "controllo", "seduta", "prenotazione"]);
+  const hasCancellation = includesAny(normalized, ["non posso", "non riesco", "non ce la faccio", "non ci sono", "rinunc", "annull", "disdett", "cancell", "non vengo", "impossibile venire", "devo saltare", "salta l'appuntamento"]);
+  const hasReschedule = includesAny(normalized, ["anticip", "spost", "cambiare", "cambio", "altro orario", "quell'orario", "quel orario", "posticip", "rimand", "riprogram"]);
+  const hasAvailability = includesAny(normalized, ["posto libero", "disponibil", "avete un posto", "c'e posto", "ce posto", "settimana prossima", "prenotare", "quando avete", "slot libero", "buco libero"]);
   const hasQuote = includesAny(normalized, ["preventivo", "prezzo", "costo", "dottore", "implant", "chiarimento"]);
   const hasConfirmation = includesAny(normalized, ["confermo", "ok", "va bene", "ci sono", "si confermo", "si, confermo"]);
+  const needsClarification = (hasCancellation || hasReschedule) && !hasAppointmentReference && !signals.date && !signals.time;
   const firstName = patientName.split(" ")[0] || "Paziente";
   const detected = [
     `Paziente: ${patientName}`,
@@ -522,6 +526,20 @@ function analyzeClientMessage(message, patientName) {
     signals.time ? `Orario: ${signals.time}` : "Orario: da verificare in agenda",
     signals.preference ? `Preferenza: ${signals.preference}` : "Preferenza: non specificata",
   ];
+
+  if (needsClarification) {
+    return {
+      intent: "da_chiarire",
+      intentLabel: "Messaggio incompleto",
+      confidence: "Media",
+      detected,
+      actionTitle: "Chiede chiarimento prima di agire",
+      actionDetail: "Il sistema non modifica l'agenda se mancano appuntamento, data o orario: prima chiede un dettaglio al paziente.",
+      reply: `Ciao ${firstName}, grazie per averci scritto. A quale appuntamento ti riferisci? Appena ce lo confermi, riorganizziamo lo slot.`,
+      status: "Chiarimento richiesto",
+      tone: "amber",
+    };
+  }
 
   if (hasCancellation && hasReschedule) {
     return {
@@ -3157,6 +3175,75 @@ function MessagesSection({
 
   return (
     <PageFrame title="Messaggi" subtitle="Simulazione live della rinuncia via chat: il sistema risponde, libera lo slot, contatta i pazienti compatibili e aggiorna l'agenda.">
+      <Panel className="mb-6 border-teal-200 p-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-bold text-slate-950">Comprensione automatica messaggi</h2>
+              <Badge tone="teal">AI operativa</Badge>
+            </div>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+              Scrivi un messaggio libero o usa un esempio: la demo riconosce intento, dati utili e azione successiva.
+            </p>
+            <p className="mt-2 text-xs leading-5 text-slate-500">
+              In produzione: AI collegata al backend. Se la confidenza e' bassa, il sistema chiede chiarimento prima di modificare l'agenda.
+            </p>
+          </div>
+          <Button onClick={handleIncomingClientMessage} className="w-full xl:w-auto">Analizza messaggio</Button>
+        </div>
+
+        <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-[220px_1fr]">
+              <select value={triagePatient} onChange={(event) => setTriagePatient(event.target.value)} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500">
+                {patients.map((patient) => <option key={patient.name}>{patient.name}</option>)}
+              </select>
+              <textarea
+                value={triageMessage}
+                onChange={(event) => setTriageMessage(event.target.value)}
+                className="min-h-[76px] rounded-md border border-slate-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-teal-500"
+                placeholder="Scrivi o modifica un messaggio del paziente"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {messageExamples.map((example) => (
+                <button
+                  key={example.label}
+                  type="button"
+                  onClick={() => handleMessageExample(example)}
+                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
+                >
+                  {example.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Analisi del sistema</div>
+            {messageUnderstanding ? (
+              <div className="mt-3 space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={messageUnderstanding.tone}>{messageUnderstanding.intentLabel}</Badge>
+                  <Badge tone="slate">Confidenza {messageUnderstanding.confidence}</Badge>
+                </div>
+                <div className="space-y-2">
+                  {messageUnderstanding.detected.map((item) => (
+                    <div key={item} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">{item}</div>
+                  ))}
+                </div>
+                <div className="rounded-md border border-teal-200 bg-white px-3 py-2">
+                  <div className="text-sm font-semibold text-slate-950">{messageUnderstanding.actionTitle}</div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">{messageUnderstanding.actionDetail}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-3 text-sm leading-6 text-slate-500">Modifica il testo e clicca Analizza messaggio.</p>
+            )}
+          </div>
+        </div>
+      </Panel>
+
       <Panel className="mb-6 p-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div>
@@ -3194,70 +3281,6 @@ function MessagesSection({
           <span className="font-semibold text-slate-950">Slot monitorato:</span>
           <span>Lunedi 25 maggio, 16:00, igiene dentale</span>
           <span className={classNames("rounded-full border px-2.5 py-1 text-xs font-semibold", statusStyle(slotLabel))}>{slotLabel}</span>
-        </div>
-      </Panel>
-
-      <Panel className="mb-6 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-950">Comprensione automatica messaggi</h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
-              Simula un messaggio libero: il sistema riconosce richiesta, paziente, dati utili e azione successiva.
-            </p>
-          </div>
-          <Badge tone="teal">AI operativa</Badge>
-        </div>
-
-        <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-[220px_1fr]">
-              <select value={triagePatient} onChange={(event) => setTriagePatient(event.target.value)} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500">
-                {patients.map((patient) => <option key={patient.name}>{patient.name}</option>)}
-              </select>
-              <textarea
-                value={triageMessage}
-                onChange={(event) => setTriageMessage(event.target.value)}
-                className="min-h-[96px] rounded-md border border-slate-200 bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-teal-500"
-                placeholder="Scrivi o modifica un messaggio del paziente"
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {messageExamples.map((example) => (
-                <button
-                  key={example.label}
-                  type="button"
-                  onClick={() => handleMessageExample(example)}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-teal-200 hover:bg-teal-50 hover:text-teal-800"
-                >
-                  {example.label}
-                </button>
-              ))}
-            </div>
-            <Button onClick={handleIncomingClientMessage}>Simula messaggio ricevuto</Button>
-          </div>
-
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Analisi del sistema</div>
-            {messageUnderstanding ? (
-              <div className="mt-3 space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone={messageUnderstanding.tone}>{messageUnderstanding.intentLabel}</Badge>
-                  <Badge tone="slate">Confidenza {messageUnderstanding.confidence}</Badge>
-                </div>
-                <div className="space-y-2">
-                  {messageUnderstanding.detected.map((item) => (
-                    <div key={item} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">{item}</div>
-                  ))}
-                </div>
-                <div className="rounded-md border border-teal-200 bg-white px-3 py-2">
-                  <div className="text-sm font-semibold text-slate-950">{messageUnderstanding.actionTitle}</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">{messageUnderstanding.actionDetail}</p>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-3 text-sm leading-6 text-slate-500">Scegli un esempio o scrivi un messaggio, poi avvia la simulazione.</p>
-            )}
-          </div>
         </div>
       </Panel>
 
