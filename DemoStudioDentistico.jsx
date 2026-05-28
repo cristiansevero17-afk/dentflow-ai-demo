@@ -244,8 +244,16 @@ function isFreeAgendaSlot(slot) {
 
 function getDetectedValue(analysis, label) {
   const prefix = `${label}:`;
-  const found = (analysis?.detected || []).find((item) => String(item).startsWith(prefix));
-  return found ? found.slice(prefix.length).trim() : "";
+  const found = (analysis?.detected || []).find((item) => {
+    const text = String(item);
+    if (text.startsWith(prefix)) return true;
+    if (label === "Data") return normalizeMessageText(text).startsWith("data");
+    if (label === "Orario") return normalizeMessageText(text).startsWith("orario");
+    return false;
+  });
+  if (!found) return "";
+  const text = String(found);
+  return text.includes(":") ? text.slice(text.indexOf(":") + 1).trim() : text.slice(prefix.length).trim();
 }
 
 function agendaKeyFromDetectedDate(value, fallbackKey = todayAgendaDate) {
