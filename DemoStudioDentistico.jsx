@@ -73,7 +73,7 @@ const fillGapSteps = [
 
 const messageScenarioSteps = [
   "Rinuncia ricevuta",
-  "Risposta studio",
+  "Risposta e agenda",
   "Slot liberato",
   "Pazienti contattati",
   "Prima conferma",
@@ -234,6 +234,143 @@ function buildDefaultSlots(day) {
 
 function sortSlotsByTime(slots) {
   return [...slots].sort((first, second) => first.time.localeCompare(second.time));
+}
+
+function isFreeAgendaSlot(slot) {
+  const status = String(slot?.status || "").toLowerCase();
+  const patient = String(slot?.patient || "").toLowerCase();
+  return status === "libero" || patient.includes("slot libero");
+}
+
+function getDetectedValue(analysis, label) {
+  const prefix = `${label}:`;
+  const found = (analysis?.detected || []).find((item) => String(item).startsWith(prefix));
+  return found ? found.slice(prefix.length).trim() : "";
+}
+
+function agendaKeyFromDetectedDate(value, fallbackKey = todayAgendaDate) {
+  const normalized = normalizeMessageText(value);
+  if (!normalized || normalized.includes("ricavare") || normalized.includes("verificare")) return fallbackKey;
+
+  if (normalized.includes("domani")) {
+    const base = new Date(`${todayAgendaDate}T12:00:00`);
+    base.setDate(base.getDate() + 1);
+    return formatAgendaDateKey(base.getFullYear(), base.getMonth(), base.getDate());
+  }
+
+  const explicitDate = normalized.match(/\b(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b/);
+  if (explicitDate) {
+    const monthIndex = agendaMonthNamesLower.indexOf(explicitDate[2]);
+    if (monthIndex >= 0) return formatAgendaDateKey(agendaYear, monthIndex, Number(explicitDate[1]));
+  }
+
+  const weekdayIndex = agendaWeekdayNames.map((day) => normalizeMessageText(day)).indexOf(normalized);
+  if (weekdayIndex >= 0) {
+    const startIndex = Math.max(0, monthDays.findIndex((day) => day.key >= todayAgendaDate));
+    const matchingDay = monthDays.slice(startIndex).find((day) => day.weekdayIndex === ((weekdayIndex + 6) % 7) && !day.closed);
+    if (matchingDay) return matchingDay.key;
+  }
+
+  if (normalized.includes("settimana prossima")) {
+    const startIndex = Math.max(0, monthDays.findIndex((day) => day.key >= todayAgendaDate));
+    const nextWeekDay = monthDays.slice(startIndex + 7).find((day) => !day.closed);
+    if (nextWeekDay) return nextWeekDay.key;
+  }
+
+  return fallbackKey;
+}
+
+function getAgendaSlotsForDay(dayKey, manualAppointments, liveSlots) {
+  const day = monthDays.find((item) => item.key === dayKey);
+  if (!day) return [];
+
+  const manualSlots = manualAppointments[dayKey] || [];
+  const baseSlots =
+    dayKey === demoAgendaDate
+      ? liveSlots
+      : monthlyAgendaSlots[dayKey] || buildDefaultSlots(day);
+
+  return day.closed ? manualSlots : sortSlotsByTime([...baseSlots, ...manualSlots]);
+}
+
+function collectAgendaOptions({ preferredDayKey, manualAppointments, liveSlots, limit = 3 }) {
+  const startIndex = Math.max(0, monthDays.findIndex((day) => day.key >= preferredDayKey));
+  const options = [];
+
+  for (const day of monthDays.slice(startIndex, startIndex + 30)) {
+    if (day.closed) continue;
+
+    const daySlots = getAgendaSlotsForDay(day.key, manualAppointments, liveSlots);
+    for (const slot of daySlots) {
+      if (!isFreeAgendaSlot(slot)) continue;
+      options.push({ day, slot });
+      if (options.length >= limit) return options;
+    }
+  }
+
+  return options;
+}
+
+function formatAgendaOption(option) {
+  if (!option) return "";
+  return `${option.day.label} alle ${option.slot.time}`;
+}
+
+function buildAutomaticAgendaResponse(analysis, patientName, { selectedAgendaDay, manualAppointments, liveSlots }) {
+  const firstName = String(patientName || "Paziente").split(" ")[0] || "Paziente";
+  const detectedDate = getDetectedValue(analysis, "Data");
+  const preferredDayKey = agendaKeyFromDetectedDate(detectedDate, selectedAgendaDay);
+  const options = collectAgendaOptions({ preferredDayKey, manualAppointments, liveSlots, limit: 3 });
+  const optionText = options.slice(0, 2).map(formatAgendaOption).join(" oppure ");
+  const backupText = "ti propongo di scegliere tra le prime disponibilita' libere che sto verificando in agenda";
+  const proposal = optionText || backupText;
+  const consultedLabel = monthDays.find((day) => day.key === preferredDayKey)?.label || "giorno indicato";
+
+  const common = {
+    title: "Risposta automatica pronta",
+    checked: `Agenda consultata da ${consultedLabel}: ${options.length ? `${options.length} disponibilita' compatibili trovate` : "nessuno slot libero immediato trovato"}.`,
+    options: options.map(formatAgendaOption),
+  };
+
+  if (analysis.intent === "rinuncia") {
+    return {
+      ...common,
+      reply: `Grazie ${firstName}, abbiamo ricevuto la rinuncia. Ho controllato l'agenda e, per riprogrammare, ${proposal}. Dimmi quale preferisci; intanto lo slot liberato viene riorganizzato automaticamente.`,
+    };
+  }
+
+  if (analysis.intent === "spostamento") {
+    return {
+      ...common,
+      reply: `Ciao ${firstName}, ho controllato l'agenda: posso proporti ${proposal}. Se una di queste opzioni va bene, aggiorno l'appuntamento e libero il vecchio slot.`,
+    };
+  }
+
+  if (analysis.intent === "richiesta_disponibilita") {
+    return {
+      ...common,
+      reply: `Ciao ${firstName}, ho verificato l'agenda e ho trovato ${proposal}. Vuoi che blocchi una di queste disponibilita'?`,
+    };
+  }
+
+  if (analysis.intent === "preventivo") {
+    return {
+      ...common,
+      reply: `Ciao ${firstName}, ho controllato l'agenda dello studio: possiamo sentirci ${formatAgendaOption(options[0]) || "alla prima disponibilita' utile"} per chiarire il preventivo. Vuoi confermare questo contatto?`,
+    };
+  }
+
+  if (analysis.intent === "conferma") {
+    return {
+      ...common,
+      reply: analysis.reply || `Perfetto ${firstName}, appuntamento confermato. A presto.`,
+    };
+  }
+
+  return {
+    ...common,
+    reply: analysis.reply || `Ciao ${firstName}, grazie per il messaggio. Lo studio ha preso in carico la richiesta e ti risponde a breve.`,
+  };
 }
 
 const patients = [
@@ -1277,26 +1414,37 @@ function DemoStudioDentisticoApp() {
       waitlist: waitlist.map((item) => ({ name: item.name, treatment: item.treatment, preference: item.preference, channel: item.channel, consent: item.consent })),
     });
     const firstName = patientName.split(" ")[0] || "Paziente";
+    const agendaSolution = buildAutomaticAgendaResponse(analysis, patientName, {
+      selectedAgendaDay,
+      manualAppointments,
+      liveSlots: slots,
+    });
+    const completedAnalysis = {
+      ...analysis,
+      agendaSolution,
+      reply: agendaSolution.reply,
+    };
     const nextConversation = {
       id: `triage-${patientName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
       name: patientName,
       channel: "WhatsApp + AI",
-      status: analysis.status,
-      preview: analysis.actionTitle,
+      status: completedAnalysis.status,
+      preview: completedAnalysis.actionTitle,
       messages: [
         { from: firstName, text: messageText },
-        { from: "Sistema", text: `Richiesta riconosciuta: ${analysis.intentLabel}. Confidenza: ${analysis.confidence}. Fonte: ${analysis.source}.` },
-        { from: "Studio AI", text: analysis.reply },
-        { from: "Sistema", text: analysis.actionDetail },
+        { from: "Sistema", text: `Richiesta riconosciuta: ${completedAnalysis.intentLabel}. Confidenza: ${completedAnalysis.confidence}. Fonte: ${completedAnalysis.source}.` },
+        { from: "Sistema", text: agendaSolution.checked },
+        { from: "Studio AI", text: agendaSolution.reply },
+        { from: "Sistema", text: completedAnalysis.actionDetail },
       ],
     };
 
-    setMessageUnderstanding(analysis);
+    setMessageUnderstanding(completedAnalysis);
     setMessageAnalysisStatus("done");
     addOrUpdateConversation(nextConversation);
     setSelectedConversation(nextConversation);
 
-    if (analysis.intent === "rinuncia") {
+    if (completedAnalysis.intent === "rinuncia") {
       setSelectedAgendaDay(demoAgendaDate);
       setSlots((current) =>
         current.map((slot) =>
@@ -1313,7 +1461,7 @@ function DemoStudioDentisticoApp() {
       ]);
     }
 
-    if (analysis.intent === "spostamento") {
+    if (completedAnalysis.intent === "spostamento") {
       setGapStatus("detected");
       setGapStep(3);
       setGapLog([
@@ -1322,7 +1470,7 @@ function DemoStudioDentisticoApp() {
       ]);
     }
 
-    if (analysis.intent === "preventivo") {
+    if (completedAnalysis.intent === "preventivo") {
       const matchingQuote = quoteRecords.find((quote) => quote.name === patientName) || selectedQuote || quoteRecords[0];
       if (matchingQuote) {
         patchQuote(
@@ -1334,10 +1482,10 @@ function DemoStudioDentisticoApp() {
     }
 
     pushNotification({
-      title: `Messaggio riconosciuto: ${analysis.intentLabel}`,
-      detail: analysis.actionTitle,
+      title: `Messaggio riconosciuto: ${completedAnalysis.intentLabel}`,
+      detail: completedAnalysis.actionTitle,
       target: "messaggi",
-      tone: analysis.tone,
+      tone: completedAnalysis.tone,
     });
   }
 
@@ -1368,7 +1516,7 @@ function DemoStudioDentisticoApp() {
     scheduleMessageStep(runId, 700, () => {
       const messages = [
         ...firstMessages,
-        { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
+        { from: "Studio", text: "Grazie per averci avvisato. Controllo subito l'agenda e riorganizzo lo slot." },
       ];
       setMessageScenarioStep(2);
       setLiveMessageConversation(messages, "Risposta inviata", "Lo studio conferma la presa in carico della rinuncia.");
@@ -1377,8 +1525,10 @@ function DemoStudioDentisticoApp() {
     scheduleMessageStep(runId, 1400, () => {
       const messages = [
         ...firstMessages,
-        { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
+        { from: "Studio", text: "Grazie per averci avvisato. Controllo subito l'agenda e riorganizzo lo slot." },
         { from: "Sistema", text: "Slot liberato in agenda: lunedi 25 maggio, ore 16:00, igiene dentale." },
+        { from: "Sistema", text: "Agenda consultata: trovate disponibilita' alternative martedi 26 maggio alle 12:00 e mercoledi 27 maggio alle 12:00." },
+        { from: "Studio", text: "Giulia, ho trovato due alternative per riprogrammare: martedi 26 maggio alle 12:00 oppure mercoledi 27 maggio alle 12:00. Quale preferisci?" },
       ];
       setSlots((current) =>
         current.map((slot) =>
@@ -1397,8 +1547,10 @@ function DemoStudioDentisticoApp() {
     scheduleMessageStep(runId, 2300, () => {
       const messages = [
         ...firstMessages,
-        { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
+        { from: "Studio", text: "Grazie per averci avvisato. Controllo subito l'agenda e riorganizzo lo slot." },
         { from: "Sistema", text: "Slot liberato in agenda: lunedi 25 maggio, ore 16:00, igiene dentale." },
+        { from: "Sistema", text: "Agenda consultata: trovate disponibilita' alternative martedi 26 maggio alle 12:00 e mercoledi 27 maggio alle 12:00." },
+        { from: "Studio", text: "Giulia, ho trovato due alternative per riprogrammare: martedi 26 maggio alle 12:00 oppure mercoledi 27 maggio alle 12:00. Quale preferisci?" },
         { from: "Sistema", text: "Pazienti compatibili trovati: Maria Rossi, Luca Bianchi, Sara Colombo e Antonio Greco." },
         { from: "Studio AI", text: "Ciao Maria, si e' appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale. Vuoi confermare?" },
         { from: "Studio AI", text: "Ciao Luca, abbiamo una disponibilita' anticipata lunedi alle 16:00 per controllo. Ti interessa?" },
@@ -1414,8 +1566,10 @@ function DemoStudioDentisticoApp() {
     scheduleMessageStep(runId, 3400, () => {
       const messages = [
         ...firstMessages,
-        { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
+        { from: "Studio", text: "Grazie per averci avvisato. Controllo subito l'agenda e riorganizzo lo slot." },
         { from: "Sistema", text: "Slot liberato in agenda: lunedi 25 maggio, ore 16:00, igiene dentale." },
+        { from: "Sistema", text: "Agenda consultata: trovate disponibilita' alternative martedi 26 maggio alle 12:00 e mercoledi 27 maggio alle 12:00." },
+        { from: "Studio", text: "Giulia, ho trovato due alternative per riprogrammare: martedi 26 maggio alle 12:00 oppure mercoledi 27 maggio alle 12:00. Quale preferisci?" },
         { from: "Sistema", text: "Pazienti compatibili trovati: Maria Rossi, Luca Bianchi, Sara Colombo e Antonio Greco." },
         { from: "Studio AI", text: "Ciao Maria, si e' appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale. Vuoi confermare?" },
         { from: "Maria", text: "Si, confermo per lunedi 25 maggio alle 16:00." },
@@ -1429,8 +1583,10 @@ function DemoStudioDentisticoApp() {
     scheduleMessageStep(runId, 4500, () => {
       const messages = [
         ...firstMessages,
-        { from: "Studio", text: "Grazie per averci avvisato. Stiamo riorganizzando lo slot." },
+        { from: "Studio", text: "Grazie per averci avvisato. Controllo subito l'agenda e riorganizzo lo slot." },
         { from: "Sistema", text: "Slot liberato in agenda: lunedi 25 maggio, ore 16:00, igiene dentale." },
+        { from: "Sistema", text: "Agenda consultata: trovate disponibilita' alternative martedi 26 maggio alle 12:00 e mercoledi 27 maggio alle 12:00." },
+        { from: "Studio", text: "Giulia, ho trovato due alternative per riprogrammare: martedi 26 maggio alle 12:00 oppure mercoledi 27 maggio alle 12:00. Quale preferisci?" },
         { from: "Sistema", text: "Pazienti compatibili trovati: Maria Rossi, Luca Bianchi, Sara Colombo e Antonio Greco." },
         { from: "Studio AI", text: "Ciao Maria, si e' appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale. Vuoi confermare?" },
         { from: "Maria", text: "Si, confermo per lunedi 25 maggio alle 16:00." },
@@ -3335,7 +3491,7 @@ function MessagesSection({
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={messageUnderstanding.tone}>{messageUnderstanding.intentLabel}</Badge>
                   <Badge tone="slate">Confidenza {messageUnderstanding.confidence}</Badge>
-                  <Badge tone={messageUnderstanding.source === "AI backend" ? "teal" : "slate"}>{messageUnderstanding.source}</Badge>
+                  <Badge tone={messageUnderstanding.source?.includes("backend") ? "teal" : "slate"}>{messageUnderstanding.source}</Badge>
                 </div>
                 {messageUnderstanding.backendError && <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">{messageUnderstanding.backendError}</div>}
                 <div className="space-y-2">
@@ -3347,6 +3503,15 @@ function MessagesSection({
                   <div className="text-sm font-semibold text-slate-950">{messageUnderstanding.actionTitle}</div>
                   <p className="mt-1 text-xs leading-5 text-slate-500">{messageUnderstanding.actionDetail}</p>
                 </div>
+                {messageUnderstanding.agendaSolution && (
+                  <div className="rounded-md border border-teal-200 bg-teal-50 px-3 py-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-teal-700">Risposta automatica dopo controllo agenda</div>
+                    <p className="mt-2 text-xs leading-5 text-teal-700">{messageUnderstanding.agendaSolution.checked}</p>
+                    <div className="mt-3 rounded-md border border-teal-100 bg-white px-3 py-2 text-sm leading-6 text-slate-700">
+                      {messageUnderstanding.agendaSolution.reply}
+                    </div>
+                  </div>
+                )}
                 <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
                   <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Azioni automatiche</div>
                   <div className="mt-2 space-y-1">
