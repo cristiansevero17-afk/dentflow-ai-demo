@@ -1756,6 +1756,14 @@ function DemoStudioDentisticoApp() {
     const executionPlan = buildMessageExecutionPlan(analysis, patientName, agendaSolution);
     const completedAnalysis = {
       ...analysis,
+      ...(agendaSolution.requiresClarification
+        ? {
+            actionTitle: "Serve chiarimento prima di modificare l'agenda",
+            actionDetail: "Il sistema ha riconosciuto la richiesta, ma non ha trovato un appuntamento univoco per quel contatto. Per sicurezza non libera slot e chiede conferma di giorno e orario.",
+            status: "Chiarimento richiesto",
+            tone: "amber",
+          }
+        : {}),
       agendaSolution,
       executionPlan,
       reply: agendaSolution.reply,
