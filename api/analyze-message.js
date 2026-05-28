@@ -178,9 +178,24 @@ function analyzeLocally(message, patientName) {
   };
 }
 
-function normalizeAnalysis(candidate, fallback) {
+function isPatientDetectedLine(value) {
+  const normalized = normalizeMessageText(value).replace(/['’]/g, "");
+  return (
+    normalized.startsWith("paziente") ||
+    normalized.startsWith("nome paziente") ||
+    normalized.startsWith("cliente") ||
+    normalized.startsWith("contatto")
+  );
+}
+
+function normalizeAnalysis(candidate, fallback, patientName = "") {
   const analysis = candidate && typeof candidate === "object" ? candidate : fallback;
   const intent = analysis.intent || fallback.intent || "generico";
+  const rawDetected = Array.isArray(analysis.detected) && analysis.detected.length ? analysis.detected.slice(0, 6) : fallback.detected;
+  const detected = patientName
+    ? [`Paziente: ${patientName}`, "Identita': bloccata dal contatto CRM/WhatsApp", ...rawDetected.filter((item) => !isPatientDetectedLine(item))]
+    : rawDetected;
+
   return {
     ...fallback,
     ...analysis,
@@ -188,7 +203,7 @@ function normalizeAnalysis(candidate, fallback) {
     intentLabel: analysis.intentLabel || analysis.intent_label || fallback.intentLabel,
     confidence: analysis.confidence || fallback.confidence,
     confidenceScore: typeof analysis.confidenceScore === "number" ? analysis.confidenceScore : fallback.confidenceScore,
-    detected: Array.isArray(analysis.detected) && analysis.detected.length ? analysis.detected.slice(0, 6) : fallback.detected,
+    detected: detected.slice(0, 6),
     operations: Array.isArray(analysis.operations) && analysis.operations.length ? analysis.operations.slice(0, 6) : operationsForIntent(intent),
     tone: analysis.tone || toneForIntent(intent),
   };
@@ -298,7 +313,7 @@ async function callOpenAI({ message, patientName, context, fallback }) {
       input: [
         {
           role: "system",
-          content: "Sei il motore operativo di una webapp per studio dentistico italiano. Classifica messaggi paziente, estrai dati utili, scegli azioni operative. Se manca un dato essenziale, non modificare l'agenda: chiedi chiarimento. Rispondi solo con JSON valido nello schema richiesto.",
+          content: `Sei il motore operativo di una webapp per studio dentistico italiano. L'identita' del paziente e' gia' nota dal contatto CRM/WhatsApp: ${patientName}. Non devi mai sostituirla con nomi presenti nel testo, nell'agenda o nel contesto. Usa Gemini/OpenAI solo per capire intento, dati utili e azioni operative. Il primo elemento di detected deve essere esattamente "Paziente: ${patientName}". Se manca un dato essenziale, non modificare l'agenda: chiedi chiarimento. Rispondi solo con JSON valido nello schema richiesto.`,
         },
         {
           role: "user",
@@ -359,7 +374,7 @@ async function callGemini({ message, patientName, context, fallback }) {
   const basePayload = {
       systemInstruction: {
         parts: [{
-          text: "Sei il motore operativo di una webapp per studio dentistico italiano. Classifica messaggi paziente, estrai dati utili, scegli azioni operative. Se manca un dato essenziale, non modificare l'agenda: chiedi chiarimento. Rispondi solo con JSON valido nello schema richiesto.",
+          text: `Sei il motore operativo di una webapp per studio dentistico italiano. L'identita' del paziente e' gia' nota dal contatto CRM/WhatsApp: ${patientName}. Non devi mai sostituirla con nomi presenti nel testo, nell'agenda o nel contesto. Usa Gemini solo per capire intento, dati utili e azioni operative. Il primo elemento di detected deve essere esattamente "Paziente: ${patientName}". Se manca un dato essenziale, non modificare l'agenda: chiedi chiarimento. Rispondi solo con JSON valido nello schema richiesto.`,
         }],
       },
       contents: [{
@@ -470,12 +485,12 @@ module.exports = async function handler(req, res) {
   try {
     const body = await readJsonBody(req);
     const { message = "", patientName = "Paziente", context = {} } = body || {};
-    const fallback = normalizeAnalysis(analyzeLocally(message, patientName), analyzeLocally(message, patientName));
+    const fallback = normalizeAnalysis(analyzeLocally(message, patientName), analyzeLocally(message, patientName), patientName);
 
     try {
       const geminiAnalysis = await callGemini({ message, patientName, context, fallback });
       if (geminiAnalysis) {
-        res.status(200).json({ usedOpenAI: false, usedGemini: true, analysis: normalizeAnalysis(geminiAnalysis, fallback) });
+        res.status(200).json({ usedOpenAI: false, usedGemini: true, analysis: normalizeAnalysis(geminiAnalysis, fallback, patientName) });
         return;
       }
     } catch (error) {
@@ -484,7 +499,7 @@ module.exports = async function handler(req, res) {
           usedOpenAI: false,
           usedGemini: false,
           warning: "Gemini non disponibile: usato fallback locale.",
-          analysis: normalizeAnalysis({ ...fallback, backendError: "Gemini non disponibile: uso fallback locale." }, fallback),
+          analysis: normalizeAnalysis({ ...fallback, backendError: "Gemini non disponibile: uso fallback locale." }, fallback, patientName),
         });
         return;
       }
@@ -493,7 +508,7 @@ module.exports = async function handler(req, res) {
     try {
       const aiAnalysis = await callOpenAI({ message, patientName, context, fallback });
       if (aiAnalysis) {
-        res.status(200).json({ usedOpenAI: true, usedGemini: false, analysis: normalizeAnalysis(aiAnalysis, fallback) });
+        res.status(200).json({ usedOpenAI: true, usedGemini: false, analysis: normalizeAnalysis(aiAnalysis, fallback, patientName) });
         return;
       }
     } catch (error) {
@@ -501,7 +516,7 @@ module.exports = async function handler(req, res) {
         usedOpenAI: false,
         usedGemini: false,
         warning: "OpenAI non disponibile: usato fallback locale.",
-        analysis: normalizeAnalysis({ ...fallback, backendError: "OpenAI non disponibile: uso fallback locale." }, fallback),
+        analysis: normalizeAnalysis({ ...fallback, backendError: "OpenAI non disponibile: uso fallback locale." }, fallback, patientName),
       });
       return;
     }

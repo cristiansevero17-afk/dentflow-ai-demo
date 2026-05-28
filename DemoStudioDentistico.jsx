@@ -324,6 +324,33 @@ function formatAgendaOption(option) {
   return `${option.day.label} alle ${option.slot.time}`;
 }
 
+function getValidDetectedTime(value) {
+  const time = String(value || "").match(/\b\d{1,2}:\d{2}\b/)?.[0] || "";
+  return time;
+}
+
+function findAppointmentForMessage(analysis, patientName, { selectedAgendaDay, manualAppointments, liveSlots }) {
+  const detectedDate = getDetectedValue(analysis, "Data");
+  const detectedTime = getValidDetectedTime(getDetectedValue(analysis, "Orario"));
+  const dayKey = agendaKeyFromDetectedDate(detectedDate, selectedAgendaDay);
+  const day = monthDays.find((item) => item.key === dayKey);
+  const daySlots = getAgendaSlotsForDay(dayKey, manualAppointments, liveSlots);
+  const patientKey = normalizeMessageText(patientName);
+  const patientSlots = daySlots.filter((slot) => normalizeMessageText(slot.patient) === patientKey);
+  const slot = detectedTime
+    ? patientSlots.find((item) => item.time === detectedTime)
+    : patientSlots.length === 1 ? patientSlots[0] : null;
+
+  return {
+    day,
+    dayKey,
+    slot,
+    detectedTime,
+    patientSlots,
+    isExact: Boolean(slot),
+  };
+}
+
 function buildAutomaticAgendaResponse(analysis, patientName, { selectedAgendaDay, manualAppointments, liveSlots }) {
   const firstName = String(patientName || "Paziente").split(" ")[0] || "Paziente";
   const detectedDate = getDetectedValue(analysis, "Data");
@@ -341,13 +368,40 @@ function buildAutomaticAgendaResponse(analysis, patientName, { selectedAgendaDay
   };
 
   if (analysis.intent === "rinuncia") {
+    const appointment = findAppointmentForMessage(analysis, patientName, { selectedAgendaDay, manualAppointments, liveSlots });
+    if (!appointment.isExact) {
+      const appointmentCount = appointment.patientSlots.length;
+      return {
+        ...common,
+        requiresClarification: true,
+        checked: appointment.day
+          ? `Agenda controllata su ${appointment.day.label}: ${appointmentCount ? `${appointmentCount} appuntamenti trovati per ${patientName}, ma manca l'orario esatto.` : `nessun appuntamento univoco trovato per ${patientName}`}.`
+          : `Agenda controllata: data non riconosciuta in modo sicuro per ${patientName}.`,
+        reply: `Grazie ${firstName}, ho letto la richiesta. Prima di modificare l'agenda mi confermi giorno e orario dell'appuntamento? Appena lo identifichiamo, libero lo slot e avvio il recupero automatico.`,
+      };
+    }
+
     return {
       ...common,
-      reply: `Grazie ${firstName}, abbiamo ricevuto la rinuncia. Ho controllato l'agenda e, per riprogrammare, ${proposal}. Dimmi quale preferisci; intanto lo slot liberato viene riorganizzato automaticamente.`,
+      checked: `Appuntamento trovato: ${appointment.day.label} alle ${appointment.slot.time}, ${appointment.slot.treatment}. Slot pronto per Fill the Gap.`,
+      affectedSlot: appointment,
+      reply: `Grazie ${firstName}, abbiamo ricevuto la rinuncia. Ho liberato lo slot di ${appointment.day.label} alle ${appointment.slot.time}. Per riprogrammare, ${proposal}. Dimmi quale preferisci; intanto lo slot liberato viene riorganizzato automaticamente.`,
     };
   }
 
   if (analysis.intent === "spostamento") {
+    const appointment = findAppointmentForMessage(analysis, patientName, { selectedAgendaDay, manualAppointments, liveSlots });
+    if (!appointment.isExact) {
+      return {
+        ...common,
+        requiresClarification: true,
+        checked: appointment.day
+          ? `Agenda controllata su ${appointment.day.label}: appuntamento originale non univoco per ${patientName}.`
+          : `Agenda controllata: data non riconosciuta in modo sicuro per ${patientName}.`,
+        reply: `Ciao ${firstName}, certo. Prima di spostare l'appuntamento mi confermi giorno e orario? Poi ti propongo subito le prime alternative compatibili.`,
+      };
+    }
+
     return {
       ...common,
       reply: `Ciao ${firstName}, ho controllato l'agenda: posso proporti ${proposal}. Se una di queste opzioni va bene, aggiorno l'appuntamento e libero il vecchio slot.`,
@@ -379,6 +433,90 @@ function buildAutomaticAgendaResponse(analysis, patientName, { selectedAgendaDay
     ...common,
     reply: analysis.reply || `Ciao ${firstName}, grazie per il messaggio. Lo studio ha preso in carico la richiesta e ti risponde a breve.`,
   };
+}
+
+function buildMessageExecutionPlan(analysis, patientName, agendaSolution) {
+  const baseSteps = [
+    {
+      label: "Identita' paziente",
+      detail: `${patientName} riconosciuto dal contatto CRM/WhatsApp, non dal testo libero.`,
+      tone: "teal",
+    },
+    {
+      label: "Comprensione Gemini",
+      detail: `${analysis.intentLabel || "Richiesta"} con confidenza ${analysis.confidence || "Media"}.`,
+      tone: analysis.tone || "slate",
+    },
+  ];
+
+  const agendaStep = {
+    label: "Agenda consultata",
+    detail: agendaSolution?.checked || "Il sistema controlla agenda, disponibilita' e stato degli slot.",
+    tone: "teal",
+  };
+
+  const replyStep = {
+    label: "Risposta inviata",
+    detail: agendaSolution?.reply || analysis.reply || "Il sistema prepara la risposta operativa al paziente.",
+    tone: "teal",
+  };
+
+  if (agendaSolution?.requiresClarification) {
+    return [
+      ...baseSteps,
+      { label: "Controllo anti-errore", detail: agendaSolution.checked, tone: "amber" },
+      { label: "Agenda protetta", detail: "Nessuno slot viene liberato finche' appuntamento, data e orario non sono univoci.", tone: "amber" },
+      replyStep,
+    ];
+  }
+
+  const map = {
+    rinuncia: [
+      ...baseSteps,
+      { label: "Slot liberato", detail: "L'appuntamento viene marcato da riempire e non resta come confermato.", tone: "rose" },
+      { label: "Fill the Gap avviato", detail: "Parte il ranking dei candidati: top 10, timer 1,5 ore, seconda ondata se serve.", tone: "teal" },
+      agendaStep,
+      replyStep,
+      { label: "Stato finale", detail: "Se arriva una conferma valida, l'agenda si aggiorna e gli altri contatti vengono avvisati.", tone: "teal" },
+    ],
+    spostamento: [
+      ...baseSteps,
+      { label: "Appuntamento originale protetto", detail: "Lo slot non viene liberato finche' il paziente non accetta una nuova proposta.", tone: "amber" },
+      agendaStep,
+      replyStep,
+      { label: "Aggiornamento automatico", detail: "Se il paziente accetta, il vecchio slot entra nel Fill the Gap.", tone: "teal" },
+    ],
+    richiesta_disponibilita: [
+      ...baseSteps,
+      agendaStep,
+      { label: "Disponibilita' filtrate", detail: "Le proposte rispettano preferenze, canale e storico conversazioni.", tone: "teal" },
+      replyStep,
+      { label: "Slot pronto da bloccare", detail: "Alla risposta positiva il calendario viene aggiornato automaticamente.", tone: "teal" },
+    ],
+    preventivo: [
+      ...baseSteps,
+      { label: "Preventivo collegato", detail: "Il messaggio viene agganciato al preventivo aperto del paziente.", tone: "amber" },
+      agendaStep,
+      replyStep,
+      { label: "Follow-up tracciato", detail: "La prossima azione viene registrata nella timeline commerciale.", tone: "teal" },
+    ],
+    conferma: [
+      ...baseSteps,
+      { label: "Conferma registrata", detail: "Lo stato appuntamento viene aggiornato in agenda e nella conversazione.", tone: "teal" },
+      replyStep,
+    ],
+    da_chiarire: [
+      ...baseSteps,
+      { label: "Protezione agenda", detail: "La webapp non modifica slot o appuntamenti quando mancano dati essenziali.", tone: "amber" },
+      replyStep,
+    ],
+  };
+
+  return map[analysis.intent] || [
+    ...baseSteps,
+    { label: "Richiesta tracciata", detail: "Il messaggio viene salvato nella conversazione e classificato per la prossima azione.", tone: "slate" },
+    replyStep,
+  ];
 }
 
 const patients = [
@@ -773,7 +911,7 @@ const messageIntentExamples = [
   {
     label: "Rinuncia appuntamento",
     patient: "Giulia Ferri",
-    text: "Non posso piu' venire il giorno 27 maggio all'appuntamento.",
+    text: "Non posso piu' venire lunedi 25 maggio alle 16:00 all'appuntamento.",
   },
   {
     label: "Cambio orario",
@@ -988,6 +1126,16 @@ function confidenceLabelFromScore(score) {
   return "Bassa";
 }
 
+function isPatientDetectedLine(value) {
+  const normalized = normalizeMessageText(value).replace(/['’]/g, "");
+  return (
+    normalized.startsWith("paziente") ||
+    normalized.startsWith("nome paziente") ||
+    normalized.startsWith("cliente") ||
+    normalized.startsWith("contatto")
+  );
+}
+
 function normalizeAnalysisOutput(candidate, fallback, source = "Motore demo locale", patientName = "") {
   const base = fallback || analyzeClientMessage("", "Paziente");
   const analysis = candidate && typeof candidate === "object" ? candidate : base;
@@ -996,7 +1144,7 @@ function normalizeAnalysisOutput(candidate, fallback, source = "Motore demo loca
   const intent = analysis.intent || base.intent || "generico";
   const detected = Array.isArray(analysis.detected) && analysis.detected.length ? analysis.detected : base.detected;
   const cleanedDetected = patientName
-    ? [`Paziente: ${patientName}`, ...detected.filter((item) => !String(item).startsWith("Paziente:"))]
+    ? [`Paziente: ${patientName}`, "Identita': bloccata dal contatto CRM/WhatsApp", ...detected.filter((item) => !isPatientDetectedLine(item))]
     : detected;
 
   return {
@@ -1605,9 +1753,11 @@ function DemoStudioDentisticoApp() {
       manualAppointments,
       liveSlots: slots,
     });
+    const executionPlan = buildMessageExecutionPlan(analysis, patientName, agendaSolution);
     const completedAnalysis = {
       ...analysis,
       agendaSolution,
+      executionPlan,
       reply: agendaSolution.reply,
     };
     const nextConversation = {
@@ -1619,6 +1769,7 @@ function DemoStudioDentisticoApp() {
       messages: [
         { from: firstName, text: messageText },
         { from: "Sistema", text: `Richiesta riconosciuta: ${completedAnalysis.intentLabel}. Confidenza: ${completedAnalysis.confidence}. Fonte: ${completedAnalysis.source}.` },
+        { from: "Sistema", text: `Identita' bloccata da CRM/WhatsApp: ${patientName}. Gemini non puo' sostituire il paziente con nomi dell'agenda.` },
         { from: "Sistema", text: agendaSolution.checked },
         { from: "Studio AI", text: agendaSolution.reply },
         { from: "Sistema", text: completedAnalysis.actionDetail },
@@ -1630,7 +1781,7 @@ function DemoStudioDentisticoApp() {
     addOrUpdateConversation(nextConversation);
     setSelectedConversation(nextConversation);
 
-    if (completedAnalysis.intent === "rinuncia") {
+    if (completedAnalysis.intent === "rinuncia" && !agendaSolution.requiresClarification) {
       setSelectedAgendaDay(demoAgendaDate);
       setSlots((current) =>
         current.map((slot) =>
@@ -1648,12 +1799,26 @@ function DemoStudioDentisticoApp() {
       ]);
     }
 
-    if (completedAnalysis.intent === "spostamento") {
+    if (completedAnalysis.intent === "rinuncia" && agendaSolution.requiresClarification) {
+      setGapLog([
+        `${patientName} ha inviato una rinuncia, ma l'appuntamento non e' stato identificato in modo univoco.`,
+        "Agenda protetta: nessuno slot viene liberato finche' il paziente conferma giorno e orario.",
+      ]);
+    }
+
+    if (completedAnalysis.intent === "spostamento" && !agendaSolution.requiresClarification) {
       setGapStatus("detected");
       setGapStep(3);
       setGapLog([
         `${patientName} chiede uno spostamento: il sistema cerca un nuovo orario e monitora lo slot originale.`,
         "Se il paziente accetta l'anticipo, lo slot liberato entra nel Fill the Gap.",
+      ]);
+    }
+
+    if (completedAnalysis.intent === "spostamento" && agendaSolution.requiresClarification) {
+      setGapLog([
+        `${patientName} ha chiesto uno spostamento, ma l'appuntamento originale non e' univoco.`,
+        "Il sistema chiede conferma prima di cambiare calendario.",
       ]);
     }
 
@@ -3719,12 +3884,16 @@ function MessagesSection({
           </Button>
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_460px]">
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-[220px_1fr]">
-              <select value={triagePatient} onChange={(event) => setTriagePatient(event.target.value)} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500">
-                {patients.map((patient) => <option key={patient.name}>{patient.name}</option>)}
-              </select>
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">Contatto CRM/WhatsApp</label>
+                <select value={triagePatient} onChange={(event) => setTriagePatient(event.target.value)} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-teal-500">
+                  {patients.map((patient) => <option key={patient.name}>{patient.name}</option>)}
+                </select>
+                <div className="mt-2 text-xs leading-5 text-teal-700">Identita' bloccata: Gemini non puo' cambiarla.</div>
+              </div>
               <textarea
                 value={triageMessage}
                 onChange={(event) => setTriageMessage(event.target.value)}
@@ -3765,6 +3934,22 @@ function MessagesSection({
                   <div className="text-sm font-semibold text-slate-950">{messageUnderstanding.actionTitle}</div>
                   <p className="mt-1 text-xs leading-5 text-slate-500">{messageUnderstanding.actionDetail}</p>
                 </div>
+                {messageUnderstanding.executionPlan && (
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Esecuzione operativa</div>
+                    <div className="mt-3 space-y-2">
+                      {messageUnderstanding.executionPlan.map((step, index) => (
+                        <div key={`${step.label}-${index}`} className="flex gap-3 rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
+                          <div className={classNames("mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold", step.tone === "teal" ? "bg-teal-700 text-white" : step.tone === "amber" ? "bg-amber-500 text-white" : step.tone === "rose" ? "bg-rose-500 text-white" : "bg-slate-700 text-white")}>{index + 1}</div>
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">{step.label}</div>
+                            <div className="mt-0.5 text-xs leading-5 text-slate-500">{step.detail}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {messageUnderstanding.agendaSolution && (
                   <div className="rounded-md border border-teal-200 bg-teal-50 px-3 py-3">
                     <div className="text-xs font-semibold uppercase tracking-wide text-teal-700">Risposta automatica dopo controllo agenda</div>
