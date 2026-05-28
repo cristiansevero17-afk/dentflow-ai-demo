@@ -226,30 +226,42 @@ function geminiSchemaFromJsonSchema(schema) {
         properties[key] = convert(property);
       }
       return {
-        type: "OBJECT",
+        type: "object",
         properties,
         required: value.required || Object.keys(properties),
       };
     }
     if (value.type === "array") {
       return {
-        type: "ARRAY",
+        type: "array",
         items: convert(value.items),
       };
     }
     if (value.type === "string") {
       return {
-        type: "STRING",
+        type: "string",
         ...(value.enum ? { enum: value.enum } : {}),
       };
     }
-    if (value.type === "number") return { type: "NUMBER" };
-    if (value.type === "integer") return { type: "INTEGER" };
-    if (value.type === "boolean") return { type: "BOOLEAN" };
+    if (value.type === "number") return { type: "number" };
+    if (value.type === "integer") return { type: "integer" };
+    if (value.type === "boolean") return { type: "boolean" };
     return value;
   };
 
   return convert(schema);
+}
+
+function getGeminiApiKey() {
+  return (
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_AI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env["Gemini API Key"] ||
+    process.env["Gemini API key"] ||
+    process.env["GEMINI API KEY"] ||
+    ""
+  ).trim();
 }
 
 async function callOpenAI({ message, patientName, context, fallback }) {
@@ -316,7 +328,7 @@ async function callOpenAI({ message, patientName, context, fallback }) {
 }
 
 async function callGemini({ message, patientName, context, fallback }) {
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  const apiKey = getGeminiApiKey();
   if (!apiKey) return null;
 
   const schema = {
@@ -337,15 +349,15 @@ async function callGemini({ message, patientName, context, fallback }) {
     },
   };
 
-  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      system_instruction: {
+  const models = [
+    process.env.GEMINI_MODEL,
+    "gemini-3.5-flash",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+  ].filter((model, index, list) => model && list.indexOf(model) === index);
+
+  const basePayload = {
+      systemInstruction: {
         parts: [{
           text: "Sei il motore operativo di una webapp per studio dentistico italiano. Classifica messaggi paziente, estrai dati utili, scegli azioni operative. Se manca un dato essenziale, non modificare l'agenda: chiedi chiarimento. Rispondi solo con JSON valido nello schema richiesto.",
         }],
@@ -356,22 +368,70 @@ async function callGemini({ message, patientName, context, fallback }) {
           text: JSON.stringify({ message, patientName, context, localFallback: fallback }),
         }],
       }],
-      generationConfig: {
-        response_mime_type: "application/json",
-        response_schema: geminiSchemaFromJsonSchema(schema),
-      },
-    }),
-  });
+  };
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Gemini request failed: ${response.status} ${errorText.slice(0, 200)}`);
+  let lastError = null;
+  const configVariants = [
+    {
+      responseFormat: {
+        text: {
+          mimeType: "application/json",
+          schema,
+        },
+      },
+    },
+    {
+      responseMimeType: "application/json",
+      responseJsonSchema: schema,
+    },
+    {
+      responseMimeType: "application/json",
+      responseSchema: geminiSchemaFromJsonSchema(schema),
+    },
+    {
+      responseMimeType: "application/json",
+    },
+  ];
+
+  for (const model of models) {
+    for (const generationConfig of configVariants) {
+      const payload = {
+        ...basePayload,
+        generationConfig,
+      };
+
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        lastError = new Error(`Gemini request failed: ${response.status} ${errorText.slice(0, 200)}`);
+        continue;
+      }
+
+      const payloadResponse = await response.json();
+      const outputText = extractGeminiText(payloadResponse);
+      if (!outputText) {
+        lastError = new Error("Gemini response missing output text");
+        continue;
+      }
+
+      try {
+        return JSON.parse(outputText);
+      } catch (error) {
+        lastError = error;
+      }
+    }
   }
 
-  const payload = await response.json();
-  const outputText = extractGeminiText(payload);
-  if (!outputText) throw new Error("Gemini response missing output text");
-  return JSON.parse(outputText);
+  if (lastError) throw lastError;
+  return null;
 }
 
 async function readJsonBody(req) {
