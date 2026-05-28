@@ -808,12 +808,17 @@ function confidenceLabelFromScore(score) {
   return "Bassa";
 }
 
-function normalizeAnalysisOutput(candidate, fallback, source = "Motore demo locale") {
+function normalizeAnalysisOutput(candidate, fallback, source = "Motore demo locale", patientName = "") {
   const base = fallback || analyzeClientMessage("", "Paziente");
   const analysis = candidate && typeof candidate === "object" ? candidate : base;
   const confidenceScore = typeof analysis.confidenceScore === "number" ? analysis.confidenceScore : typeof analysis.confidence_score === "number" ? analysis.confidence_score : null;
   const confidence = analysis.confidence || confidenceLabelFromScore(confidenceScore) || base.confidence || "Media";
   const intent = analysis.intent || base.intent || "generico";
+  const detected = Array.isArray(analysis.detected) && analysis.detected.length ? analysis.detected : base.detected;
+  const cleanedDetected = patientName
+    ? [`Paziente: ${patientName}`, ...detected.filter((item) => !String(item).startsWith("Paziente:"))]
+    : detected;
+
   return {
     ...base,
     ...analysis,
@@ -821,7 +826,7 @@ function normalizeAnalysisOutput(candidate, fallback, source = "Motore demo loca
     intentLabel: analysis.intentLabel || analysis.intent_label || base.intentLabel || "Richiesta generica",
     confidence,
     confidenceScore,
-    detected: Array.isArray(analysis.detected) && analysis.detected.length ? analysis.detected : base.detected,
+    detected: cleanedDetected,
     operations: Array.isArray(analysis.operations) && analysis.operations.length ? analysis.operations : operationsForIntent(intent),
     tone: analysis.tone || toneForIntent(intent),
     source,
@@ -829,7 +834,7 @@ function normalizeAnalysisOutput(candidate, fallback, source = "Motore demo loca
 }
 
 async function requestMessageAnalysis(message, patientName, context = {}) {
-  const fallback = normalizeAnalysisOutput(analyzeClientMessage(message, patientName), null, "Motore demo locale");
+  const fallback = normalizeAnalysisOutput(analyzeClientMessage(message, patientName), null, "Motore demo locale", patientName);
 
   try {
     const response = await fetch("/api/analyze-message", {
@@ -841,7 +846,7 @@ async function requestMessageAnalysis(message, patientName, context = {}) {
     if (!response.ok) throw new Error(`Backend AI non disponibile (${response.status})`);
     const data = await response.json();
     const source = data.usedGemini ? "Gemini backend" : data.usedOpenAI ? "OpenAI backend" : "Motore demo locale";
-    return normalizeAnalysisOutput(data.analysis, fallback, source);
+    return normalizeAnalysisOutput(data.analysis, fallback, source, patientName);
   } catch (error) {
     return {
       ...fallback,
