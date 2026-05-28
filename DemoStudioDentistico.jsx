@@ -46,28 +46,28 @@ const fillGapSteps = [
     detail: "L'agenda evidenzia lo spazio da riempire.",
   },
   {
-    title: "Ricerca pazienti compatibili",
-    detail: "Il sistema controlla lista d'attesa, preferenze, prossimita' e consenso.",
+    title: "Scoring candidati",
+    detail: "Il sistema ordina i pazienti per disponibilita', storico, canale, consenso e coerenza con lo slot.",
   },
   {
-    title: "Classifica suggerimenti",
-    detail: "I pazienti vengono ordinati per probabilita' e coerenza con lo slot.",
+    title: "Prima ondata top 10",
+    detail: "Partono i messaggi solo ai 10 candidati migliori per quel giorno e quell'orario.",
   },
   {
-    title: "Messaggi automatici",
-    detail: "WhatsApp, SMS o email partono sul canale preferito.",
+    title: "Timeout 1,5 ore",
+    detail: "Chi non risponde resta in attesa; il sistema puo' aprire la richiesta ad altri candidati.",
   },
   {
-    title: "Risposta ricevuta",
-    detail: "Il primo paziente disponibile conferma lo slot.",
+    title: "Risposte e alternative",
+    detail: "Se un paziente non puo' in quello slot, riceve proposte coerenti con le sue disponibilita'.",
   },
   {
-    title: "Agenda aggiornata",
-    detail: "Lo slot viene assegnato automaticamente.",
+    title: "Conferma valida",
+    detail: "Il primo si' compatibile occupa lo slot e aggiorna automaticamente l'agenda.",
   },
   {
-    title: "Esito finale",
-    detail: "Lo staff vede lo slot recuperato senza chiamate manuali.",
+    title: "Chiusura contatti",
+    detail: "Gli altri pazienti contattati ricevono un messaggio che lo slot e' gia' stato assegnato.",
   },
 ];
 
@@ -516,11 +516,183 @@ const waitlist = [
 ];
 
 const candidateList = [
-  { name: "Maria Rossi", reason: "Lista d'attesa, preferenza pomeriggio, consenso attivo", channel: "WhatsApp", fit: "Molto alta", consent: true, response: "Si, confermo per lunedi 25 maggio alle 16:00." },
-  { name: "Luca Bianchi", reason: "Igiene da riprogrammare, usa WhatsApp", channel: "WhatsApp", fit: "Alta", consent: true, response: "Posso solo dopo le 17:00." },
-  { name: "Antonio Greco", reason: "Disponibile dopo le 16:00, canale SMS", channel: "SMS", fit: "Buona", consent: true, response: "Resto in attesa di altre date." },
-  { name: "Roberto Galli", reason: "Consenso comunicazioni non attivo", channel: "Email", fit: "Escluso", consent: false, response: "Non contattato." },
+  {
+    rank: 1,
+    name: "Maria Rossi",
+    reason: "Lista d'attesa, igiene, preferenza pomeriggio, consenso attivo",
+    channel: "WhatsApp",
+    fit: "96%",
+    consent: true,
+    score: 96,
+    wave: "Top 10",
+    availability: "Pomeriggio, last-minute",
+    source: "Registrazione + storico chat",
+    response: "Si, confermo per lunedi 25 maggio alle 16:00.",
+  },
+  {
+    rank: 2,
+    name: "Antonio Greco",
+    reason: "Igiene scaduta, disponibile dopo le 16:00, canale SMS",
+    channel: "SMS",
+    fit: "91%",
+    consent: true,
+    score: 91,
+    wave: "Top 10",
+    availability: "Dopo le 16:00",
+    source: "CRM + preferenze registrate",
+    response: "Posso esserci, ma preferisco conferma via SMS.",
+  },
+  {
+    rank: 3,
+    name: "Luca Bianchi",
+    reason: "Storico igiene, WhatsApp rapido, disponibile in serata",
+    channel: "WhatsApp",
+    fit: "87%",
+    consent: true,
+    score: 87,
+    wave: "Top 10",
+    availability: "Dopo le 17:00",
+    source: "Storico chat: risponde dopo lavoro",
+    response: "Posso solo dopo le 17:00.",
+  },
+  {
+    rank: 4,
+    name: "Sara Colombo",
+    reason: "Richiamo igiene vicino, risposta WhatsApp frequente",
+    channel: "WhatsApp",
+    fit: "84%",
+    consent: true,
+    score: 84,
+    wave: "Top 10",
+    availability: "Mattina o pausa pranzo",
+    source: "Follow-up + storico chat",
+    response: "Non riesco alle 16:00, avete mattina?",
+  },
+  {
+    rank: 5,
+    name: "Giulia Ferri",
+    reason: "Paziente abituale, controllo recente, preferisce mattina",
+    channel: "WhatsApp",
+    fit: "78%",
+    consent: true,
+    score: 78,
+    wave: "Top 10",
+    availability: "Mattina",
+    source: "CRM",
+    response: "Non disponibile per quello slot.",
+  },
+  {
+    rank: 6,
+    name: "Andrea Moretti",
+    reason: "Paziente inattivo, WhatsApp, flessibilita' media",
+    channel: "WhatsApp",
+    fit: "74%",
+    consent: true,
+    score: 74,
+    wave: "Top 10",
+    availability: "Pomeriggio con preavviso",
+    source: "Campagna inattivi",
+    response: "Mi interessa, ma non oggi.",
+  },
+  {
+    rank: 7,
+    name: "Paola Esposito",
+    reason: "Ha gia' un appuntamento a rischio, canale email",
+    channel: "Email",
+    fit: "68%",
+    consent: true,
+    score: 68,
+    wave: "Top 10",
+    availability: "Pomeriggio",
+    source: "Agenda + email lette",
+    response: "Nessuna risposta entro 1,5 ore.",
+  },
+  {
+    rank: 8,
+    name: "Marco Riva",
+    reason: "Controllo post-intervento, SMS, disponibilita' parziale",
+    channel: "SMS",
+    fit: "64%",
+    consent: true,
+    score: 64,
+    wave: "Top 10",
+    availability: "Tardo pomeriggio",
+    source: "Follow-up post-intervento",
+    response: "Nessuna risposta entro 1,5 ore.",
+  },
+  {
+    rank: 9,
+    name: "Nadia Villa",
+    reason: "Igiene in scadenza, vicina allo studio, WhatsApp",
+    channel: "WhatsApp",
+    fit: "61%",
+    consent: true,
+    score: 61,
+    wave: "Top 10",
+    availability: "Dopo le 15:30",
+    source: "CRM + distanza",
+    response: "Risponde tardi: slot gia' assegnato.",
+  },
+  {
+    rank: 10,
+    name: "Francesca Sala",
+    reason: "Prima visita recente, consenso attivo, fascia compatibile",
+    channel: "SMS",
+    fit: "58%",
+    consent: true,
+    score: 58,
+    wave: "Top 10",
+    availability: "Pomeriggio",
+    source: "CRM",
+    response: "Nessuna risposta entro 1,5 ore.",
+  },
+  {
+    rank: 11,
+    name: "Silvia Monti",
+    reason: "Seconda ondata se i primi 10 non rispondono",
+    channel: "WhatsApp",
+    fit: "54%",
+    consent: true,
+    score: 54,
+    wave: "Seconda ondata",
+    availability: "Pomeriggio variabile",
+    source: "Lista attesa secondaria",
+    response: "Contattabile solo se lo slot resta libero.",
+  },
+  {
+    rank: null,
+    name: "Roberto Galli",
+    reason: "Consenso comunicazioni non attivo",
+    channel: "Email",
+    fit: "Escluso",
+    consent: false,
+    score: 0,
+    wave: "Non contattare",
+    availability: "Non usabile per campagne",
+    source: "Compliance",
+    response: "Non contattato.",
+  },
 ];
+
+function candidateTone(candidate) {
+  if (!candidate.consent) return "rose";
+  if (candidate.score >= 85) return "teal";
+  if (candidate.score >= 65) return "amber";
+  return "slate";
+}
+
+function candidateStatusForStep(candidate, step) {
+  if (!candidate.consent) return "Escluso";
+  if (candidate.wave === "Seconda ondata") return step >= 5 && step < 7 ? "Pronto se serve" : "In attesa";
+  if (step < 4) return "Selezionato";
+  if (step < 5) return candidate.rank <= 10 ? "Messaggio inviato" : "In attesa";
+  if (step < 6) return ["Maria Rossi", "Luca Bianchi", "Sara Colombo"].includes(candidate.name) ? "Risposta ricevuta" : "Timer 1,5 ore";
+  if (step < 7) return candidate.name === "Maria Rossi" ? "Accetta slot" : ["Luca Bianchi", "Sara Colombo"].includes(candidate.name) ? "Riceve alternativa" : "Timer 1,5 ore";
+  if (step < 8) return candidate.name === "Maria Rossi" ? "Assegnato" : "In chiusura";
+  return candidate.name === "Maria Rossi" ? "Slot confermato" : "Avvisato: slot assegnato";
+}
+
+const topGapCandidates = candidateList.filter((candidate) => candidate.consent && candidate.rank && candidate.rank <= 10);
 
 const compatibilityFactors = [
   "Trattamento compatibile con lo slot",
@@ -1354,7 +1526,8 @@ function DemoStudioDentisticoApp() {
     setGapSimulationRunning(false);
     setGapLog([
       "Il sistema ha rilevato una rinuncia per lunedi 25 maggio alle 16:00.",
-      "Sistema in ricerca di pazienti compatibili con consenso attivo.",
+      "Sistema in scoring automatico: disponibilita', storico chat, preferenze, consenso e trattamento richiesto.",
+      "Pronta la prima ondata sui 10 candidati migliori per quello slot.",
     ]);
     pushNotification({
       title: "Slot da riempire rilevato",
@@ -1470,7 +1643,8 @@ function DemoStudioDentisticoApp() {
       setGapStep(2);
       setGapLog([
         `${patientName} ha rinunciato: lo slot e' stato marcato da riempire.`,
-        "Il sistema ha preparato la ricerca pazienti compatibili per il Fill the Gap.",
+        "Il sistema ha preparato il ranking dei candidati e contattera' prima i 10 profili piu coerenti.",
+        "Se nessuno conferma entro 1,5 ore, lo slot passa alla seconda ondata.",
       ]);
     }
 
@@ -1564,16 +1738,17 @@ function DemoStudioDentisticoApp() {
         { from: "Sistema", text: "Slot liberato in agenda: lunedi 25 maggio, ore 16:00, igiene dentale." },
         { from: "Sistema", text: "Agenda consultata: trovate disponibilita' alternative martedi 26 maggio alle 12:00 e mercoledi 27 maggio alle 12:00." },
         { from: "Studio", text: "Giulia, ho trovato due alternative per riprogrammare: martedi 26 maggio alle 12:00 oppure mercoledi 27 maggio alle 12:00. Quale preferisci?" },
-        { from: "Sistema", text: "Pazienti compatibili trovati: Maria Rossi, Luca Bianchi, Sara Colombo e Antonio Greco." },
+        { from: "Sistema", text: "Scoring candidati completato: primi 10 selezionati per disponibilita', storico chat, consenso e coerenza con igiene alle 16:00." },
         { from: "Studio AI", text: "Ciao Maria, si e' appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale. Vuoi confermare?" },
-        { from: "Studio AI", text: "Ciao Luca, abbiamo una disponibilita' anticipata lunedi alle 16:00 per controllo. Ti interessa?" },
+        { from: "Studio AI", text: "Ciao Antonio, abbiamo una disponibilita' oggi alle 16:00 per igiene dentale. Puoi confermare via SMS?" },
+        { from: "Studio AI", text: "Ciao Luca, si e' liberato uno slot alle 16:00. Se non puoi, ti propongo automaticamente alternative dopo le 17:00." },
         { from: "Studio AI", text: "Ciao Sara, si e' liberato uno slot per igiene dentale lunedi alle 16:00. Vuoi bloccarlo?" },
       ];
       setGapStatus("sending");
       setGapStep(5);
-      setGapLog((current) => ["Messaggi automatici inviati ai pazienti compatibili con consenso attivo.", ...current]);
+      setGapLog((current) => ["Prima ondata inviata ai 10 candidati migliori con consenso attivo.", ...current]);
       setMessageScenarioStep(4);
-      setLiveMessageConversation(messages, "Messaggi inviati", "La campagna automatica e' partita sui pazienti compatibili.");
+      setLiveMessageConversation(messages, "Top 10 contattati", "La prima ondata e' partita sui candidati migliori.");
     });
 
     scheduleMessageStep(runId, 3400, () => {
@@ -1583,14 +1758,18 @@ function DemoStudioDentisticoApp() {
         { from: "Sistema", text: "Slot liberato in agenda: lunedi 25 maggio, ore 16:00, igiene dentale." },
         { from: "Sistema", text: "Agenda consultata: trovate disponibilita' alternative martedi 26 maggio alle 12:00 e mercoledi 27 maggio alle 12:00." },
         { from: "Studio", text: "Giulia, ho trovato due alternative per riprogrammare: martedi 26 maggio alle 12:00 oppure mercoledi 27 maggio alle 12:00. Quale preferisci?" },
-        { from: "Sistema", text: "Pazienti compatibili trovati: Maria Rossi, Luca Bianchi, Sara Colombo e Antonio Greco." },
+        { from: "Sistema", text: "Scoring candidati completato: primi 10 selezionati per disponibilita', storico chat, consenso e coerenza con igiene alle 16:00." },
         { from: "Studio AI", text: "Ciao Maria, si e' appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale. Vuoi confermare?" },
         { from: "Maria", text: "Si, confermo per lunedi 25 maggio alle 16:00." },
         { from: "Luca", text: "Posso solo dopo le 17:00." },
+        { from: "Studio AI", text: "Luca, grazie. Per te ho trovato mercoledi 27 alle 18:00 oppure venerdi 29 alle 17:30. Vuoi una di queste opzioni?" },
+        { from: "Sara", text: "Alle 16:00 non riesco, avete mattina?" },
+        { from: "Studio AI", text: "Sara, ti tengo in priorita' per la mattina. Prima disponibilita': giovedi alle 10:30." },
+        { from: "Sistema", text: "Timer 1,5 ore attivo: chi non risponde non blocca lo slot; se nessuno conferma, parte la seconda ondata." },
       ];
       setGapStep(6);
       setMessageScenarioStep(5);
-      setLiveMessageConversation(messages, "Prima conferma", "Maria Rossi conferma lo slot disponibile.");
+      setLiveMessageConversation(messages, "Risposte gestite", "Maria accetta, altri ricevono alternative coerenti.");
     });
 
     scheduleMessageStep(runId, 4500, () => {
@@ -1600,11 +1779,12 @@ function DemoStudioDentisticoApp() {
         { from: "Sistema", text: "Slot liberato in agenda: lunedi 25 maggio, ore 16:00, igiene dentale." },
         { from: "Sistema", text: "Agenda consultata: trovate disponibilita' alternative martedi 26 maggio alle 12:00 e mercoledi 27 maggio alle 12:00." },
         { from: "Studio", text: "Giulia, ho trovato due alternative per riprogrammare: martedi 26 maggio alle 12:00 oppure mercoledi 27 maggio alle 12:00. Quale preferisci?" },
-        { from: "Sistema", text: "Pazienti compatibili trovati: Maria Rossi, Luca Bianchi, Sara Colombo e Antonio Greco." },
+        { from: "Sistema", text: "Scoring candidati completato: primi 10 selezionati per disponibilita', storico chat, consenso e coerenza con igiene alle 16:00." },
         { from: "Studio AI", text: "Ciao Maria, si e' appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale. Vuoi confermare?" },
         { from: "Maria", text: "Si, confermo per lunedi 25 maggio alle 16:00." },
         { from: "Sistema", text: "Prima risposta valida ricevuta. Lo slot e' stato assegnato a Maria Rossi e gli altri invii sono stati fermati." },
         { from: "Studio", text: "Perfetto Maria, appuntamento confermato. A lunedi." },
+        { from: "Studio AI", text: "Messaggio automatico agli altri contattati: lo slot delle 16:00 e' gia' stato assegnato. Vi ricontatteremo appena si libera una disponibilita' compatibile." },
       ];
       completeFillGapAssignment();
       setGapStep(8);
@@ -1696,6 +1876,30 @@ function DemoStudioDentisticoApp() {
         { from: "Studio", text: "Perfetto, appuntamento confermato. A lunedi." },
       ],
     });
+    addOrUpdateConversation({
+      id: "luca-gap-chiuso",
+      name: "Luca Bianchi",
+      channel: "WhatsApp",
+      status: "Slot gia' assegnato",
+      preview: "Lo slot e' stato assegnato, ti proponiamo alternative dopo le 17:00.",
+      messages: [
+        { from: "Studio AI", text: "Ciao Luca, si era liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale. Ti interessava?" },
+        { from: "Luca", text: "Posso solo dopo le 17:00." },
+        { from: "Studio AI", text: "Grazie Luca, lo slot delle 16:00 e' gia' stato assegnato. Ho verificato l'agenda: posso proporti mercoledi 27 maggio alle 18:00 oppure venerdi 29 maggio alle 17:30." },
+      ],
+    });
+    addOrUpdateConversation({
+      id: "sara-gap-chiuso",
+      name: "Sara Colombo",
+      channel: "WhatsApp",
+      status: "Slot gia' assegnato",
+      preview: "Lo slot e' stato assegnato, resta in coda per la mattina.",
+      messages: [
+        { from: "Studio AI", text: "Ciao Sara, si e' liberato uno slot lunedi alle 16:00 per igiene dentale. Vuoi bloccarlo?" },
+        { from: "Sara", text: "Non riesco alle 16:00, avete mattina?" },
+        { from: "Studio AI", text: "Grazie Sara, lo slot delle 16:00 e' gia' stato assegnato. Ti tengo in priorita' per la prossima disponibilita' mattutina e ti propongo giovedi alle 10:30." },
+      ],
+    });
   }
 
   function patchQuote(targetQuote, patch, timelineLines = []) {
@@ -1748,14 +1952,16 @@ function DemoStudioDentisticoApp() {
     scheduleGapStep(runId, offset + 750, () => {
       setGapStep(3);
       setGapLog((current) => [
-        "Ricerca pazienti compatibili: lista d'attesa, igiene scaduta, preferenza pomeriggio, distanza e consenso.",
+        "Scoring completato: il sistema ha ordinato i candidati per trattamento, preferenza oraria, consenso, storico chat, rapidita' di risposta e disponibilita' last-minute.",
+        "Top 10 selezionati per lo slot di lunedi 25 maggio alle 16:00: Maria, Antonio, Luca, Sara, Giulia, Andrea, Paola, Marco, Nadia e Francesca.",
         ...current,
       ]);
     });
     scheduleGapStep(runId, offset + 1500, () => {
       setGapStep(4);
       setGapLog((current) => [
-        "Classifica pronta: Maria Rossi risulta la migliore candidata per trattamento, fascia oraria e consenso.",
+        "Prima ondata inviata ai 10 migliori candidati sui canali preferiti: WhatsApp, SMS o email.",
+        "Ogni messaggio usa una proposta coerente con la disponibilita' stimata del paziente e con il consenso attivo.",
         ...current,
       ]);
     });
@@ -1763,30 +1969,35 @@ function DemoStudioDentisticoApp() {
       setGapStep(5);
       setGapStatus("sending");
       setGapLog((current) => [
-        mode === "auto" ? "Messaggi automatici inviati dopo la rinuncia WhatsApp." : "Messaggi automatici inviati ai pazienti compatibili.",
-        "Maria Rossi: WhatsApp inviato. Luca Bianchi: SMS inviato. Antonio Greco: email inviata.",
+        "Timer simulato 1,5 ore avviato: chi non risponde resta in attesa e non blocca lo slot.",
+        "Luca risponde che puo' solo dopo le 17:00: il sistema gli propone automaticamente due alternative compatibili.",
+        "Sara chiede la mattina: il sistema propone le prime disponibilita' mattutine senza assegnare lo slot delle 16:00.",
         ...current,
       ]);
     });
     scheduleGapStep(runId, offset + 3150, () => {
       setGapStep(6);
       setGapLog((current) => [
-        "Maria Rossi ha risposto: Si, confermo per lunedi 25 maggio alle 16:00.",
-        "Luca Bianchi ha risposto: posso solo dopo le 17:00.",
+        "Maria Rossi risponde SI entro la finestra: il sistema verifica che lo slot sia ancora libero.",
+        "Gli altri candidati senza risposta vengono mantenuti in coda solo finche' lo slot non viene assegnato.",
         ...current,
       ]);
     });
     scheduleGapStep(runId, offset + 4050, () => {
       setGapStep(7);
       completeFillGapAssignment();
-      setGapLog((current) => ["Agenda aggiornata: lo slot delle 16:00 e stato assegnato a Maria Rossi.", ...current]);
+      setGapLog((current) => [
+        "Agenda aggiornata: lo slot delle 16:00 e' stato assegnato a Maria Rossi.",
+        "La seconda ondata non parte perche' e' arrivata una conferma valida dalla prima ondata.",
+        ...current,
+      ]);
     });
     scheduleGapStep(runId, offset + 4950, () => {
       setGapStep(8);
       setGapSimulationRunning(false);
       setGapLog((current) => [
-        "Esito finale: slot recuperato senza chiamate manuali della segreteria.",
-        "La segreteria vede il risultato gia' registrato in agenda e nei messaggi.",
+        "Messaggio automatico agli altri contattati: lo slot e' gia' stato assegnato, vi ricontatteremo per prossime disponibilita'.",
+        "Esito finale: gap riempito, conversazioni tracciate e agenda aggiornata senza chiamate manuali.",
         ...current,
       ]);
     });
@@ -2686,23 +2897,33 @@ function FillGapStepTimeline({ step }) {
 }
 
 function FillGapMessageStates({ step }) {
-  const states = [
-    { name: "Maria Rossi", channel: "WhatsApp", status: step >= 6 ? "Risposto" : step >= 5 ? "Letto" : "In attesa" },
-    { name: "Luca Bianchi", channel: "SMS", status: step >= 6 ? "Risposto piu tardi" : step >= 5 ? "Consegnato" : "In attesa" },
-    { name: "Antonio Greco", channel: "Email", status: step >= 5 ? "Inviato" : "In attesa" },
-  ];
+  const states = topGapCandidates.map((candidate) => ({
+    name: candidate.name,
+    channel: candidate.channel,
+    rank: candidate.rank,
+    status: candidateStatusForStep(candidate, step),
+  }));
 
   return (
-    <div className="mt-4 space-y-2">
+    <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-2">
       {states.map((item) => (
         <div key={item.name} className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
           <div>
-            <div className="font-semibold text-slate-900">{item.name}</div>
+            <div className="font-semibold text-slate-900">#{item.rank} {item.name}</div>
             <div className="text-xs text-slate-500">{item.channel}</div>
           </div>
-          <Badge tone={item.status === "Risposto" ? "teal" : item.status === "In attesa" ? "slate" : "amber"}>{item.status}</Badge>
+          <Badge tone={item.status.includes("confermato") || item.status.includes("Assegnato") || item.status.includes("Accetta") ? "teal" : item.status.includes("Timer") || item.status.includes("alternativa") ? "amber" : "slate"}>{item.status}</Badge>
         </div>
       ))}
+    </div>
+  );
+}
+
+function ScoreBar({ score }) {
+  const width = Math.max(0, Math.min(100, score || 0));
+  return (
+    <div className="mt-2 h-1.5 w-full rounded-full bg-slate-100">
+      <div className="h-1.5 rounded-full bg-teal-600" style={{ width: `${width}%` }} />
     </div>
   );
 }
@@ -2719,7 +2940,7 @@ function FillGapSection({ status, step, isSimulationRunning, log, slot, simulate
             title="Cosa evidenziare"
             items={[
               { label: "Evento", value: "Una rinuncia libera uno slot in agenda." },
-              { label: "Automazione", value: "Il sistema trova pazienti compatibili e invia i messaggi." },
+              { label: "Automazione", value: "Scoring, top 10, timer 1,5 ore e seconda ondata se serve." },
               { label: "Risultato", value: status === "filled" ? "Slot riempito e conversazione tracciata." : "Il titolare vede il processo mentre avanza." },
             ]}
           />
@@ -2775,14 +2996,16 @@ function FillGapSection({ status, step, isSimulationRunning, log, slot, simulate
           </Panel>
 
           <Panel className="p-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <h3 className="font-bold text-slate-950">Pazienti suggeriti</h3>
-                <p className="mt-1 text-sm text-slate-500">La selezione considera lista d'attesa, preferenza oraria, trattamento richiesto e consenso.</p>
+                <h3 className="font-bold text-slate-950">Ranking candidati per lo slot</h3>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                  Il sistema contatta prima i 10 profili migliori per giorno, orario, trattamento, storico chat e consenso. Gli altri entrano solo se il timer scade senza conferma.
+                </p>
               </div>
-              <Badge tone="teal">Consenso verificato</Badge>
+              <Badge tone="teal">Prima ondata top 10</Badge>
             </div>
-            <div className="mt-5 space-y-3">
+            <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
               {candidateList.map((candidate) => (
                 <div
                   key={candidate.name}
@@ -2790,29 +3013,55 @@ function FillGapSection({ status, step, isSimulationRunning, log, slot, simulate
                     "rounded-lg border p-4 transition",
                     candidate.consent ? "border-slate-200 bg-white" : "border-slate-200 bg-slate-50 opacity-70",
                     currentStep < 3 && "opacity-50",
-                    currentStep >= 4 && candidate.name === "Maria Rossi" && "border-teal-300 bg-teal-50"
+                    currentStep >= 4 && candidate.rank && candidate.rank <= 10 && "border-teal-200",
+                    currentStep >= 7 && candidate.name === "Maria Rossi" && "border-teal-300 bg-teal-50"
                   )}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <div className="font-semibold text-slate-950">{candidate.name}</div>
-                      <div className="mt-1 text-sm text-slate-500">{candidate.reason}</div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-slate-950">{candidate.rank ? `#${candidate.rank} ${candidate.name}` : candidate.name}</span>
+                        <Badge tone={candidateTone(candidate)}>{candidate.fit}</Badge>
+                      </div>
+                      <div className="mt-1 text-sm leading-5 text-slate-500">{candidate.reason}</div>
                     </div>
                     <div className="flex gap-2">
                       <Badge tone={candidate.consent ? "teal" : "slate"}>{candidate.channel}</Badge>
-                      <Badge tone={candidate.fit === "Escluso" ? "rose" : candidate.fit === "Buona" ? "slate" : "teal"}>{candidate.fit}</Badge>
+                      <Badge tone={candidate.wave === "Top 10" ? "teal" : candidate.wave === "Seconda ondata" ? "amber" : "rose"}>{candidate.wave}</Badge>
                     </div>
                   </div>
+                  {candidate.consent && (
+                    <>
+                      <ScoreBar score={candidate.score} />
+                      <div className="mt-3 grid grid-cols-1 gap-2 text-xs leading-5 text-slate-500 sm:grid-cols-2">
+                        <div><span className="font-semibold text-slate-700">Disponibilita':</span> {candidate.availability}</div>
+                        <div><span className="font-semibold text-slate-700">Fonte:</span> {candidate.source}</div>
+                      </div>
+                    </>
+                  )}
+                  {currentStep >= 4 && (
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-xs">
+                      <span className="text-slate-500">{candidate.response}</span>
+                      <Badge tone={candidateTone(candidate)}>{candidateStatusForStep(candidate, currentStep)}</Badge>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
           </Panel>
 
           <Panel className="p-6">
-            <h3 className="font-bold text-slate-950">Anteprima messaggio</h3>
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
-              Ciao Maria, si e appena liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale presso Demo Studio Dentistico.
-              Vuoi confermare l'appuntamento? Rispondi SI e lo blocchiamo per te.
+            <h3 className="font-bold text-slate-950">Messaggi generati</h3>
+            <div className="mt-4 space-y-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                <span className="font-semibold text-slate-950">Maria:</span> si e' liberato uno slot lunedi 25 maggio alle 16:00 per igiene dentale. Vuoi confermare? Rispondi SI e lo blocchiamo.
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700">
+                <span className="font-semibold text-slate-950">Luca:</span> se non puoi alle 16:00, ho trovato alternative dopo le 17:00: mercoledi 27 alle 18:00 o venerdi 29 alle 17:30.
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700">
+                <span className="font-semibold text-slate-950">Chiusura:</span> lo slot e' gia' stato assegnato. Ti ricontatteremo appena si libera una disponibilita' compatibile.
+              </div>
             </div>
             <p className="mt-3 text-xs leading-5 text-slate-500">
               Invio solo a pazienti con consenso comunicazioni attivo. Ogni messaggio puo' includere indicazioni per non ricevere ulteriori comunicazioni non necessarie.
@@ -2826,8 +3075,8 @@ function FillGapSection({ status, step, isSimulationRunning, log, slot, simulate
             title="Causa-effetto"
             items={[
               { label: "Evento", value: hasDetectedSlot ? "Rinuncia o slot libero rilevato." : "Slot ancora confermato." },
-              { label: "Automazione", value: currentStep >= 5 ? "Messaggi inviati sui canali preferiti." : "Ricerca pazienti pronta." },
-              { label: "Risultato", value: status === "filled" ? "Agenda aggiornata con Maria Rossi." : "In attesa della conferma." },
+              { label: "Priorita'", value: currentStep >= 4 ? "Top 10 contattati prima degli altri." : "Scoring su disponibilita' e storico." },
+              { label: "Risultato", value: status === "filled" ? "Agenda aggiornata e contatti chiusi." : "Timer pronto per seconda ondata." },
             ]}
           />
 
