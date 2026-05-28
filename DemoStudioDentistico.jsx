@@ -555,6 +555,20 @@ function analyzeClientMessage(message, patientName) {
     };
   }
 
+  if (hasReschedule && hasAppointmentReference) {
+    return {
+      intent: "spostamento",
+      intentLabel: "Spostamento appuntamento",
+      confidence: "Alta",
+      detected,
+      actionTitle: "Controlla agenda e propone un nuovo orario",
+      actionDetail: "Il sistema identifica l'appuntamento indicato, cerca disponibilita' alternative e risponde con una proposta compatibile.",
+      reply: `Ciao ${firstName}, certo. Controllo subito le disponibilita' per spostare l'appuntamento e ti propongo il primo orario compatibile.`,
+      status: "Spostamento proposto",
+      tone: "amber",
+    };
+  }
+
   if (hasCancellation) {
     return {
       intent: "rinuncia",
@@ -622,6 +636,81 @@ function analyzeClientMessage(message, patientName) {
     status: "Richiesta presa in carico",
     tone: "slate",
   };
+}
+
+function operationsForIntent(intent) {
+  const map = {
+    rinuncia: ["Identifica l'appuntamento in agenda", "Libera lo slot", "Avvia Fill the Gap sui pazienti compatibili", "Invia risposta di presa in carico"],
+    spostamento: ["Controlla l'appuntamento originale", "Cerca orari alternativi", "Invia proposta al paziente", "Monitora lo slot che potrebbe liberarsi"],
+    richiesta_disponibilita: ["Filtra agenda per fascia richiesta", "Trova slot liberi compatibili", "Propone due disponibilita'", "Aggiorna la conversazione"],
+    preventivo: ["Collega il messaggio al preventivo aperto", "Propone chiarimento o chiamata", "Aggiorna stato preventivo", "Registra la risposta"],
+    conferma: ["Conferma lo slot in agenda", "Aggiorna stato conversazione", "Registra conferma nel CRM"],
+    da_chiarire: ["Non modifica l'agenda", "Chiede il dettaglio mancante", "Mantiene la richiesta in coda"],
+    generico: ["Traccia il messaggio", "Crea attivita' operativa", "Prepara risposta controllata"],
+  };
+  return map[intent] || map.generico;
+}
+
+function toneForIntent(intent) {
+  const tones = {
+    rinuncia: "rose",
+    spostamento: "amber",
+    richiesta_disponibilita: "teal",
+    preventivo: "amber",
+    conferma: "teal",
+    da_chiarire: "amber",
+    generico: "slate",
+  };
+  return tones[intent] || "slate";
+}
+
+function confidenceLabelFromScore(score) {
+  if (typeof score !== "number") return null;
+  if (score >= 0.78) return "Alta";
+  if (score >= 0.55) return "Media";
+  return "Bassa";
+}
+
+function normalizeAnalysisOutput(candidate, fallback, source = "Motore demo locale") {
+  const base = fallback || analyzeClientMessage("", "Paziente");
+  const analysis = candidate && typeof candidate === "object" ? candidate : base;
+  const confidenceScore = typeof analysis.confidenceScore === "number" ? analysis.confidenceScore : typeof analysis.confidence_score === "number" ? analysis.confidence_score : null;
+  const confidence = analysis.confidence || confidenceLabelFromScore(confidenceScore) || base.confidence || "Media";
+  const intent = analysis.intent || base.intent || "generico";
+  return {
+    ...base,
+    ...analysis,
+    intent,
+    intentLabel: analysis.intentLabel || analysis.intent_label || base.intentLabel || "Richiesta generica",
+    confidence,
+    confidenceScore,
+    detected: Array.isArray(analysis.detected) && analysis.detected.length ? analysis.detected : base.detected,
+    operations: Array.isArray(analysis.operations) && analysis.operations.length ? analysis.operations : operationsForIntent(intent),
+    tone: analysis.tone || toneForIntent(intent),
+    source,
+  };
+}
+
+async function requestMessageAnalysis(message, patientName, context = {}) {
+  const fallback = normalizeAnalysisOutput(analyzeClientMessage(message, patientName), null, "Motore demo locale");
+
+  try {
+    const response = await fetch("/api/analyze-message", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, patientName, context }),
+    });
+
+    if (!response.ok) throw new Error(`Backend AI non disponibile (${response.status})`);
+    const data = await response.json();
+    return normalizeAnalysisOutput(data.analysis, fallback, data.usedOpenAI ? "AI backend" : "Motore demo locale");
+  } catch (error) {
+    return {
+      ...fallback,
+      backendError: "Backend AI non configurato: uso del motore demo locale.",
+      source: "Motore demo locale",
+    };
+  }
 }
 
 function classNames(...values) {
@@ -940,6 +1029,7 @@ function DemoStudioDentisticoApp() {
   const [triagePatient, setTriagePatient] = useState(messageIntentExamples[0].patient);
   const [triageMessage, setTriageMessage] = useState(messageIntentExamples[0].text);
   const [messageUnderstanding, setMessageUnderstanding] = useState(null);
+  const [messageAnalysisStatus, setMessageAnalysisStatus] = useState("idle");
   const [notifications, setNotifications] = useState(initialNotifications);
   const [guidedScenario, setGuidedScenario] = useState("idle");
   const [daySimulation, setDaySimulation] = useState({ status: "idle", step: 0, events: [] });
@@ -1036,6 +1126,11 @@ function DemoStudioDentisticoApp() {
     const current = conversations.find((conversation) => conversation.id === selectedConversation?.id);
     if (current) setSelectedConversation(current);
   }, [conversations]);
+
+  useEffect(() => {
+    setMessageUnderstanding(null);
+    setMessageAnalysisStatus("idle");
+  }, [triagePatient, triageMessage]);
 
   useEffect(() => {
     let source;
@@ -1170,24 +1265,33 @@ function DemoStudioDentisticoApp() {
     setMessageUnderstanding(null);
   }
 
-  function handleIncomingClientMessage() {
-    const analysis = analyzeClientMessage(triageMessage, triagePatient);
-    const firstName = triagePatient.split(" ")[0] || "Paziente";
+  async function handleIncomingClientMessage() {
+    const patientName = triagePatient;
+    const messageText = triageMessage;
+    setMessageAnalysisStatus("analyzing");
+    const analysis = await requestMessageAnalysis(messageText, patientName, {
+      knownPatients: patientRecords.map((patient) => ({ name: patient.name, preferredChannel: patient.preferredChannel, consent: patient.consent, nextVisit: patient.nextVisit })),
+      agenda: selectedDaySlots.map((slot) => ({ time: slot.time, patient: slot.patient, treatment: slot.treatment, status: slot.status, channel: slot.channel })),
+      quotes: quoteRecords.map((quote) => ({ name: quote.name, treatment: quote.treatment, status: quote.status, next: quote.next })),
+      waitlist: waitlist.map((item) => ({ name: item.name, treatment: item.treatment, preference: item.preference, channel: item.channel, consent: item.consent })),
+    });
+    const firstName = patientName.split(" ")[0] || "Paziente";
     const nextConversation = {
-      id: `triage-${triagePatient.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-      name: triagePatient,
+      id: `triage-${patientName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+      name: patientName,
       channel: "WhatsApp + AI",
       status: analysis.status,
       preview: analysis.actionTitle,
       messages: [
-        { from: firstName, text: triageMessage },
-        { from: "Sistema", text: `Richiesta riconosciuta: ${analysis.intentLabel}. Confidenza: ${analysis.confidence}.` },
+        { from: firstName, text: messageText },
+        { from: "Sistema", text: `Richiesta riconosciuta: ${analysis.intentLabel}. Confidenza: ${analysis.confidence}. Fonte: ${analysis.source}.` },
         { from: "Studio AI", text: analysis.reply },
         { from: "Sistema", text: analysis.actionDetail },
       ],
     };
 
     setMessageUnderstanding(analysis);
+    setMessageAnalysisStatus("done");
     addOrUpdateConversation(nextConversation);
     setSelectedConversation(nextConversation);
 
@@ -1203,7 +1307,7 @@ function DemoStudioDentisticoApp() {
       setGapStatus("detected");
       setGapStep(2);
       setGapLog([
-        `${triagePatient} ha rinunciato: lo slot e' stato marcato da riempire.`,
+        `${patientName} ha rinunciato: lo slot e' stato marcato da riempire.`,
         "Il sistema ha preparato la ricerca pazienti compatibili per il Fill the Gap.",
       ]);
     }
@@ -1212,13 +1316,13 @@ function DemoStudioDentisticoApp() {
       setGapStatus("detected");
       setGapStep(3);
       setGapLog([
-        `${triagePatient} chiede uno spostamento: il sistema cerca un nuovo orario e monitora lo slot originale.`,
+        `${patientName} chiede uno spostamento: il sistema cerca un nuovo orario e monitora lo slot originale.`,
         "Se il paziente accetta l'anticipo, lo slot liberato entra nel Fill the Gap.",
       ]);
     }
 
     if (analysis.intent === "preventivo") {
-      const matchingQuote = quoteRecords.find((quote) => quote.name === triagePatient) || selectedQuote || quoteRecords[0];
+      const matchingQuote = quoteRecords.find((quote) => quote.name === patientName) || selectedQuote || quoteRecords[0];
       if (matchingQuote) {
         patchQuote(
           matchingQuote,
@@ -2012,6 +2116,7 @@ function DemoStudioDentisticoApp() {
               triageMessage={triageMessage}
               setTriageMessage={setTriageMessage}
               messageUnderstanding={messageUnderstanding}
+              messageAnalysisStatus={messageAnalysisStatus}
               messageExamples={messageIntentExamples}
               handleMessageExample={handleMessageExample}
               handleIncomingClientMessage={handleIncomingClientMessage}
@@ -3163,6 +3268,7 @@ function MessagesSection({
   triageMessage,
   setTriageMessage,
   messageUnderstanding,
+  messageAnalysisStatus,
   messageExamples,
   handleMessageExample,
   handleIncomingClientMessage,
@@ -3189,7 +3295,9 @@ function MessagesSection({
               In produzione: AI collegata al backend. Se la confidenza e' bassa, il sistema chiede chiarimento prima di modificare l'agenda.
             </p>
           </div>
-          <Button onClick={handleIncomingClientMessage} className="w-full xl:w-auto">Analizza messaggio</Button>
+          <Button onClick={handleIncomingClientMessage} disabled={messageAnalysisStatus === "analyzing"} className="w-full xl:w-auto">
+            {messageAnalysisStatus === "analyzing" ? "Analisi in corso" : "Analizza messaggio"}
+          </Button>
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -3226,7 +3334,9 @@ function MessagesSection({
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={messageUnderstanding.tone}>{messageUnderstanding.intentLabel}</Badge>
                   <Badge tone="slate">Confidenza {messageUnderstanding.confidence}</Badge>
+                  <Badge tone={messageUnderstanding.source === "AI backend" ? "teal" : "slate"}>{messageUnderstanding.source}</Badge>
                 </div>
+                {messageUnderstanding.backendError && <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">{messageUnderstanding.backendError}</div>}
                 <div className="space-y-2">
                   {messageUnderstanding.detected.map((item) => (
                     <div key={item} className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">{item}</div>
@@ -3235,6 +3345,14 @@ function MessagesSection({
                 <div className="rounded-md border border-teal-200 bg-white px-3 py-2">
                   <div className="text-sm font-semibold text-slate-950">{messageUnderstanding.actionTitle}</div>
                   <p className="mt-1 text-xs leading-5 text-slate-500">{messageUnderstanding.actionDetail}</p>
+                </div>
+                <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Azioni automatiche</div>
+                  <div className="mt-2 space-y-1">
+                    {messageUnderstanding.operations.map((operation) => (
+                      <div key={operation} className="text-xs leading-5 text-slate-600">{operation}</div>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : (

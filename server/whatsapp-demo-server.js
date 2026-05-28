@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const qrcode = require("qrcode");
 const { Client, LocalAuth } = require("whatsapp-web.js");
+const analyzeMessageHandler = require("../api/analyze-message");
 
 const rootDir = path.resolve(__dirname, "..");
 const port = Number(process.env.WHATSAPP_DEMO_PORT || 8787);
@@ -166,6 +167,8 @@ async function ensureClient() {
 app.get("/api/whatsapp/status", (_req, res) => {
   res.json(snapshot());
 });
+
+app.post("/api/analyze-message", analyzeMessageHandler);
 
 app.post("/api/whatsapp/connect", async (_req, res) => {
   const current = await ensureClient();
