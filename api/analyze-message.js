@@ -184,7 +184,8 @@ function isPatientDetectedLine(value) {
     normalized.startsWith("paziente") ||
     normalized.startsWith("nome paziente") ||
     normalized.startsWith("cliente") ||
-    normalized.startsWith("contatto")
+    normalized.startsWith("contatto") ||
+    normalized.startsWith("identita")
   );
 }
 

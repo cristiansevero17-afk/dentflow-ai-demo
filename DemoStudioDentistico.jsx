@@ -1132,7 +1132,8 @@ function isPatientDetectedLine(value) {
     normalized.startsWith("paziente") ||
     normalized.startsWith("nome paziente") ||
     normalized.startsWith("cliente") ||
-    normalized.startsWith("contatto")
+    normalized.startsWith("contatto") ||
+    normalized.startsWith("identita")
   );
 }
 
@@ -1762,6 +1763,12 @@ function DemoStudioDentisticoApp() {
             actionDetail: "Il sistema ha riconosciuto la richiesta, ma non ha trovato un appuntamento univoco per quel contatto. Per sicurezza non libera slot e chiede conferma di giorno e orario.",
             status: "Chiarimento richiesto",
             tone: "amber",
+            operations: [
+              "Identita' paziente bloccata dal contatto CRM/WhatsApp",
+              "Agenda controllata senza trovare appuntamento univoco",
+              "Nessuno slot liberato per evitare errori operativi",
+              "Richiesta conferma di giorno e orario al paziente",
+            ],
           }
         : {}),
       agendaSolution,
