@@ -703,7 +703,8 @@ async function requestMessageAnalysis(message, patientName, context = {}) {
 
     if (!response.ok) throw new Error(`Backend AI non disponibile (${response.status})`);
     const data = await response.json();
-    return normalizeAnalysisOutput(data.analysis, fallback, data.usedOpenAI ? "AI backend" : "Motore demo locale");
+    const source = data.usedGemini ? "Gemini backend" : data.usedOpenAI ? "OpenAI backend" : "Motore demo locale";
+    return normalizeAnalysisOutput(data.analysis, fallback, source);
   } catch (error) {
     return {
       ...fallback,

@@ -206,6 +206,52 @@ function extractOutputText(payload) {
   return "";
 }
 
+function extractGeminiText(payload) {
+  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+  for (const candidate of candidates) {
+    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
+    for (const part of parts) {
+      if (typeof part.text === "string") return part.text;
+    }
+  }
+  return "";
+}
+
+function geminiSchemaFromJsonSchema(schema) {
+  const convert = (value) => {
+    if (!value || typeof value !== "object") return value;
+    if (value.type === "object") {
+      const properties = {};
+      for (const [key, property] of Object.entries(value.properties || {})) {
+        properties[key] = convert(property);
+      }
+      return {
+        type: "OBJECT",
+        properties,
+        required: value.required || Object.keys(properties),
+      };
+    }
+    if (value.type === "array") {
+      return {
+        type: "ARRAY",
+        items: convert(value.items),
+      };
+    }
+    if (value.type === "string") {
+      return {
+        type: "STRING",
+        ...(value.enum ? { enum: value.enum } : {}),
+      };
+    }
+    if (value.type === "number") return { type: "NUMBER" };
+    if (value.type === "integer") return { type: "INTEGER" };
+    if (value.type === "boolean") return { type: "BOOLEAN" };
+    return value;
+  };
+
+  return convert(schema);
+}
+
 async function callOpenAI({ message, patientName, context, fallback }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
@@ -269,6 +315,65 @@ async function callOpenAI({ message, patientName, context, fallback }) {
   return JSON.parse(outputText);
 }
 
+async function callGemini({ message, patientName, context, fallback }) {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY;
+  if (!apiKey) return null;
+
+  const schema = {
+    type: "object",
+    required: ["intent", "intentLabel", "confidence", "confidenceScore", "detected", "actionTitle", "actionDetail", "reply", "status", "operations", "tone"],
+    properties: {
+      intent: { type: "string", enum: ["rinuncia", "spostamento", "richiesta_disponibilita", "preventivo", "conferma", "da_chiarire", "generico"] },
+      intentLabel: { type: "string" },
+      confidence: { type: "string", enum: ["Alta", "Buona", "Media", "Bassa"] },
+      confidenceScore: { type: "number" },
+      detected: { type: "array", items: { type: "string" } },
+      actionTitle: { type: "string" },
+      actionDetail: { type: "string" },
+      reply: { type: "string" },
+      status: { type: "string" },
+      operations: { type: "array", items: { type: "string" } },
+      tone: { type: "string", enum: ["slate", "teal", "amber", "rose"] },
+    },
+  };
+
+  const model = process.env.GEMINI_MODEL || "gemini-3.5-flash";
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      system_instruction: {
+        parts: [{
+          text: "Sei il motore operativo di una webapp per studio dentistico italiano. Classifica messaggi paziente, estrai dati utili, scegli azioni operative. Se manca un dato essenziale, non modificare l'agenda: chiedi chiarimento. Rispondi solo con JSON valido nello schema richiesto.",
+        }],
+      },
+      contents: [{
+        role: "user",
+        parts: [{
+          text: JSON.stringify({ message, patientName, context, localFallback: fallback }),
+        }],
+      }],
+      generationConfig: {
+        response_mime_type: "application/json",
+        response_schema: geminiSchemaFromJsonSchema(schema),
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini request failed: ${response.status} ${errorText.slice(0, 200)}`);
+  }
+
+  const payload = await response.json();
+  const outputText = extractGeminiText(payload);
+  if (!outputText) throw new Error("Gemini response missing output text");
+  return JSON.parse(outputText);
+}
+
 async function readJsonBody(req) {
   if (req.body && typeof req.body === "object") return req.body;
   if (typeof req.body === "string") {
@@ -308,21 +413,40 @@ module.exports = async function handler(req, res) {
     const fallback = normalizeAnalysis(analyzeLocally(message, patientName), analyzeLocally(message, patientName));
 
     try {
+      const geminiAnalysis = await callGemini({ message, patientName, context, fallback });
+      if (geminiAnalysis) {
+        res.status(200).json({ usedOpenAI: false, usedGemini: true, analysis: normalizeAnalysis(geminiAnalysis, fallback) });
+        return;
+      }
+    } catch (error) {
+      if (!process.env.OPENAI_API_KEY) {
+        res.status(200).json({
+          usedOpenAI: false,
+          usedGemini: false,
+          warning: "Gemini non disponibile: usato fallback locale.",
+          analysis: normalizeAnalysis({ ...fallback, backendError: "Gemini non disponibile: uso fallback locale." }, fallback),
+        });
+        return;
+      }
+    }
+
+    try {
       const aiAnalysis = await callOpenAI({ message, patientName, context, fallback });
       if (aiAnalysis) {
-        res.status(200).json({ usedOpenAI: true, analysis: normalizeAnalysis(aiAnalysis, fallback) });
+        res.status(200).json({ usedOpenAI: true, usedGemini: false, analysis: normalizeAnalysis(aiAnalysis, fallback) });
         return;
       }
     } catch (error) {
       res.status(200).json({
         usedOpenAI: false,
+        usedGemini: false,
         warning: "OpenAI non disponibile: usato fallback locale.",
         analysis: normalizeAnalysis({ ...fallback, backendError: "OpenAI non disponibile: uso fallback locale." }, fallback),
       });
       return;
     }
 
-    res.status(200).json({ usedOpenAI: false, analysis: fallback });
+    res.status(200).json({ usedOpenAI: false, usedGemini: false, analysis: fallback });
   } catch (error) {
     res.status(500).json({ error: "Analisi messaggio non riuscita" });
   }
