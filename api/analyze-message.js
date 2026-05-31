@@ -74,7 +74,7 @@ function analyzeLocally(message, patientName) {
     signals.preference ? `Preferenza: ${signals.preference}` : "Preferenza: non specificata",
   ];
 
-  if ((hasCancellation || hasReschedule) && !hasAppointmentReference && !signals.date && !signals.time) {
+  if (hasReschedule && !hasCancellation && !hasAppointmentReference && !signals.date && !signals.time) {
     return {
       intent: "da_chiarire",
       intentLabel: "Messaggio incompleto",
@@ -314,7 +314,7 @@ async function callOpenAI({ message, patientName, context, fallback }) {
       input: [
         {
           role: "system",
-          content: `Sei il motore operativo di una webapp per studio dentistico italiano. L'identita' del paziente e' gia' nota dal contatto CRM/WhatsApp: ${patientName}. Non devi mai sostituirla con nomi presenti nel testo, nell'agenda o nel contesto. Usa Gemini/OpenAI solo per capire intento, dati utili e azioni operative. Il primo elemento di detected deve essere esattamente "Paziente: ${patientName}". Se manca un dato essenziale, non modificare l'agenda: chiedi chiarimento. Rispondi solo con JSON valido nello schema richiesto.`,
+          content: `Sei il motore operativo di una webapp per studio dentistico italiano. L'identita' del paziente e' gia' nota dal contatto CRM/WhatsApp: ${patientName}. Non devi mai sostituirla con nomi presenti nel testo, nell'agenda o nel contesto. Usa Gemini/OpenAI solo per capire intento, dati utili e azioni operative. Il primo elemento di detected deve essere esattamente "Paziente: ${patientName}". Se il messaggio e' una rinuncia o annullamento, non chiedere chiarimento: collega la richiesta all'appuntamento attivo presente nel contesto o al prossimo appuntamento del paziente. Chiedi chiarimento solo per richieste non operative o non riconoscibili. Rispondi solo con JSON valido nello schema richiesto.`,
         },
         {
           role: "user",
@@ -375,7 +375,7 @@ async function callGemini({ message, patientName, context, fallback }) {
   const basePayload = {
       systemInstruction: {
         parts: [{
-          text: `Sei il motore operativo di una webapp per studio dentistico italiano. L'identita' del paziente e' gia' nota dal contatto CRM/WhatsApp: ${patientName}. Non devi mai sostituirla con nomi presenti nel testo, nell'agenda o nel contesto. Usa Gemini solo per capire intento, dati utili e azioni operative. Il primo elemento di detected deve essere esattamente "Paziente: ${patientName}". Se manca un dato essenziale, non modificare l'agenda: chiedi chiarimento. Rispondi solo con JSON valido nello schema richiesto.`,
+          text: `Sei il motore operativo di una webapp per studio dentistico italiano. L'identita' del paziente e' gia' nota dal contatto CRM/WhatsApp: ${patientName}. Non devi mai sostituirla con nomi presenti nel testo, nell'agenda o nel contesto. Usa Gemini solo per capire intento, dati utili e azioni operative. Il primo elemento di detected deve essere esattamente "Paziente: ${patientName}". Se il messaggio e' una rinuncia o annullamento, non chiedere chiarimento: collega la richiesta all'appuntamento attivo presente nel contesto o al prossimo appuntamento del paziente. Chiedi chiarimento solo per richieste non operative o non riconoscibili. Rispondi solo con JSON valido nello schema richiesto.`,
         }],
       },
       contents: [{

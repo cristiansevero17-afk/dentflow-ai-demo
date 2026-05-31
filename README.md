@@ -88,6 +88,21 @@ Webhook WhatsApp Business:
 https://tuo-dominio/api/whatsapp-webhook
 ```
 
+## Test WhatsApp prodotto
+
+Il QR nella pagina prodotto deve contenere il numero WhatsApp Business dello studio, non quello del cliente. Il cliente lo usa solo per aprire la chat verso lo studio.
+
+Per testare il bot automatico reale:
+
+1. Crea o usa un numero WhatsApp Business separato per lo studio.
+2. In Meta Developers collega WhatsApp Cloud API a quel numero.
+3. Su Vercel imposta `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` e `WHATSAPP_VERIFY_TOKEN`.
+4. In Meta imposta il webhook su `https://tuo-dominio/api/whatsapp-webhook`.
+5. Iscriviti all'evento `messages`.
+6. Scrivi allo studio da un secondo numero WhatsApp usato come cliente.
+
+Quando arriva una rinuncia, il webhook passa il testo a Gemini, prepara la risposta e invia automaticamente il messaggio tramite WhatsApp Cloud API. Per rendere persistenti agenda, pazienti e Fill the Gap in produzione serve poi collegare un database.
+
 ### Vercel
 
 - Framework Preset: Other

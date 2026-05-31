@@ -90,6 +90,11 @@ function normalizeText(value) {
     .trim();
 }
 
+function isCancellationIntentText(value) {
+  const text = normalizeText(value);
+  return ["non posso", "non riesco", "rinunc", "annull", "disdett", "cancell", "non vengo", "devo saltare"].some((keyword) => text.includes(keyword));
+}
+
 function timeBucket(time) {
   const hour = Number(String(time || "00:00").slice(0, 2));
   if (hour < 12) return "Mattina";
@@ -446,6 +451,23 @@ function appointmentMatchesRequest(appointment, analysis) {
   return dateOk && timeOk;
 }
 
+function pickAppointmentForCancellation(appointments, analysis) {
+  const activeAppointments = appointments
+    .filter((appointment) => appointment.status !== "annullato" && appointment.status !== "da riempire")
+    .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+  const exactAppointment = activeAppointments.find((appointment) => appointmentMatchesRequest(appointment, analysis));
+  if (exactAppointment) {
+    return { appointment: exactAppointment, match: "exact" };
+  }
+
+  const upcomingAppointment = activeAppointments.find((appointment) => appointment.date >= todayISO());
+  if (upcomingAppointment) {
+    return { appointment: upcomingAppointment, match: "next" };
+  }
+
+  return activeAppointments[0] ? { appointment: activeAppointments[0], match: "history" } : { appointment: null, match: "none" };
+}
+
 function Pill({ children, tone = "slate" }) {
   const tones = {
     teal: "border-teal-200 bg-teal-50 text-teal-700",
@@ -459,8 +481,8 @@ function Pill({ children, tone = "slate" }) {
 
 function Button({ children, variant = "primary", className = "", ...props }) {
   const variants = {
-    primary: "bg-teal-700 text-white hover:bg-teal-800",
-    secondary: "border border-slate-200 bg-white text-slate-700 hover:border-teal-200 hover:text-teal-700",
+    primary: "bg-teal-700 text-white shadow-sm shadow-teal-900/10 hover:bg-teal-800",
+    secondary: "border border-slate-200 bg-white text-slate-700 shadow-sm hover:border-teal-200 hover:text-teal-700",
     soft: "border border-teal-100 bg-teal-50 text-teal-700 hover:bg-teal-100",
     danger: "border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100",
   };
@@ -475,7 +497,7 @@ function Button({ children, variant = "primary", className = "", ...props }) {
 }
 
 function Panel({ children, className = "" }) {
-  return <div className={`rounded-2xl border border-slate-200 bg-white shadow-sm ${className}`}>{children}</div>;
+  return <div className={`rounded-3xl border border-slate-200/80 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.05)] ${className}`}>{children}</div>;
 }
 
 function Field({ label, children }) {
@@ -504,7 +526,7 @@ function SectionHeader({ eyebrow, title, description, right }) {
     <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div className="max-w-3xl">
         {eyebrow ? <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-teal-700">{eyebrow}</div> : null}
-        <h1 className="text-3xl font-bold tracking-tight text-slate-950">{title}</h1>
+        <h1 className="text-[2rem] font-bold tracking-tight text-slate-950">{title}</h1>
         {description ? <p className="mt-2 text-base leading-7 text-slate-600">{description}</p> : null}
       </div>
       {right}
@@ -514,11 +536,11 @@ function SectionHeader({ eyebrow, title, description, right }) {
 
 function HomeScreen({ setActiveSection }) {
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10 text-slate-950">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#e8fbf7_0,#f6f8fb_34%,#f8fafc_100%)] px-6 py-8 text-slate-950">
       <div className="mx-auto max-w-7xl">
-        <header className="flex items-center justify-between border-b border-slate-200 pb-8">
+        <header className="flex h-24 items-center justify-between border-b border-slate-200/80">
           <div className="flex items-center gap-4">
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-teal-700 text-xl font-bold text-white">S</div>
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-teal-700 to-cyan-600 text-xl font-bold text-white shadow-lg shadow-teal-900/15">S</div>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">StudioFlow Dental</h1>
               <p className="text-sm text-slate-500">Webapp operativa per studio dentistico</p>
@@ -541,9 +563,9 @@ function HomeScreen({ setActiveSection }) {
               <button
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
-                className="group rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-md"
+                className="group rounded-3xl border border-slate-200/80 bg-white/95 p-5 text-left shadow-[0_18px_45px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg"
               >
-                <div className="mb-5 grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-xl">{item.icon}</div>
+                <div className="mb-5 grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-xl shadow-sm">{item.icon}</div>
                 <h3 className="text-lg font-bold text-slate-950">{item.label}</h3>
                 <p className="mt-3 min-h-[3.5rem] text-sm leading-6 text-slate-600">{item.preview}</p>
                 <span className="mt-4 inline-flex text-sm font-bold text-teal-700">Apri sezione</span>
@@ -558,39 +580,34 @@ function HomeScreen({ setActiveSection }) {
 
 function Sidebar({ activeSection, setActiveSection, setHome }) {
   return (
-    <aside className="fixed inset-y-0 left-0 hidden w-80 border-r border-slate-200 bg-white xl:block">
+    <aside className="fixed inset-y-0 left-0 hidden w-80 border-r border-slate-200/80 bg-white xl:block">
       <div className="flex h-full flex-col">
-        <div className="border-b border-slate-200 p-7">
+        <div className="flex h-24 items-center border-b border-slate-200/80 px-6">
           <div className="flex items-center gap-4">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-teal-700 font-bold text-white">S</div>
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-teal-700 to-cyan-600 font-bold text-white shadow-md shadow-teal-900/15">S</div>
             <div>
-              <div className="text-lg font-bold text-slate-950">StudioFlow Dental</div>
+              <div className="text-base font-bold text-slate-950">StudioFlow Dental</div>
               <div className="text-sm text-slate-500">Studio dentistico · Milano</div>
             </div>
           </div>
         </div>
-        <nav className="flex-1 space-y-2 overflow-y-auto p-5">
+        <nav className="flex-1 space-y-1.5 overflow-hidden p-4">
           {NAV_ITEMS.map((item) => {
             const active = activeSection === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => setActiveSection(item.id)}
-                className={`flex w-full items-center gap-4 rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
+                className={`flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold transition ${
                   active ? "bg-teal-50 text-teal-800 ring-1 ring-teal-100" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
                 }`}
               >
-                <span className="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-lg">{item.icon}</span>
+                <span className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-base shadow-sm">{item.icon}</span>
                 <span>{item.label}</span>
               </button>
             );
           })}
         </nav>
-        <div className="border-t border-slate-200 p-5">
-          <Button variant="secondary" className="w-full" onClick={setHome}>
-            Home
-          </Button>
-        </div>
       </div>
     </aside>
   );
@@ -599,21 +616,21 @@ function Sidebar({ activeSection, setActiveSection, setHome }) {
 function AppShell({ activeSection, setActiveSection, children }) {
   const active = NAV_ITEMS.find((item) => item.id === activeSection);
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950">
+    <div className="min-h-screen bg-[#f6f8fb] text-slate-950">
       <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} setHome={() => setActiveSection("home")} />
       <div className="xl:pl-80">
-        <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-6 py-4 backdrop-blur">
-          <div className="mx-auto flex max-w-7xl items-center justify-between">
+        <header className="sticky top-0 z-20 h-24 border-b border-slate-200/80 bg-white/95 px-6 backdrop-blur">
+          <div className="mx-auto flex h-full max-w-7xl items-center justify-between">
             <div>
-              <div className="text-sm font-bold text-slate-950">{active?.label || "Home"}</div>
-              <div className="text-sm text-slate-500">{active?.preview}</div>
+              <div className="text-base font-bold text-slate-950">{active?.label || "Home"}</div>
+              <div className="mt-1 text-sm text-slate-500">{active?.preview}</div>
             </div>
             <Button variant="secondary" onClick={() => setActiveSection("home")}>
               Home
             </Button>
           </div>
         </header>
-        <main className="mx-auto max-w-7xl px-6 py-10">{children}</main>
+        <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
       </div>
     </div>
   );
@@ -1227,24 +1244,28 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
       const payload = await response.json();
       const analysis = payload.analysis || {};
       const ownAppointments = appointments.filter((item) => item.patientId === selectedPatient.id && item.status !== "annullato");
-      const exactAppointment = ownAppointments.find((appointment) => appointmentMatchesRequest(appointment, analysis));
+      const cancellationTarget = pickAppointmentForCancellation(ownAppointments, analysis);
       const options = findOpenSlots(appointments, todayISO(), "");
+      const isCancellation = analysis.intent === "rinuncia" || isCancellationIntentText(message);
+      const finalAnalysis = isCancellation ? { ...analysis, intent: "rinuncia", intentLabel: "Rinuncia appuntamento", confidence: analysis.confidence || "Alta" } : analysis;
       let operationalReply = analysis.reply || `Ciao ${selectedPatient.name.split(" ")[0]}, abbiamo preso in carico la richiesta.`;
       let action = "Nessuna modifica automatica";
 
-      if (analysis.intent === "rinuncia" && exactAppointment) {
-        setAppointments((current) => current.map((item) => (item.id === exactAppointment.id ? { ...item, status: "da riempire" } : item)));
-        onCreateGap(exactAppointment);
+      if (isCancellation && cancellationTarget.appointment) {
+        const appointmentToFree = cancellationTarget.appointment;
+        setAppointments((current) => current.map((item) => (item.id === appointmentToFree.id ? { ...item, status: "da riempire" } : item)));
+        onCreateGap(appointmentToFree);
         action = "Slot liberato e Fill the Gap avviato";
-        operationalReply = `Grazie ${selectedPatient.name.split(" ")[0]}, abbiamo registrato la rinuncia per ${formatDate(exactAppointment.date)} alle ${exactAppointment.time}. Ti proponiamo nuove disponibilita': ${options.slice(0, 2).map((item) => `${formatDate(item.date)} alle ${item.time}`).join(" oppure ")}.`;
+        const matchText = cancellationTarget.match === "exact" ? "per l'appuntamento indicato" : "collegandola al tuo prossimo appuntamento registrato in agenda";
+        operationalReply = `Grazie ${selectedPatient.name.split(" ")[0]}, abbiamo registrato la rinuncia ${matchText}: ${formatDate(appointmentToFree.date)} alle ${appointmentToFree.time}. Lo studio sta riorganizzando lo slot; intanto ti proponiamo queste alternative: ${options.slice(0, 2).map((item) => `${formatDate(item.date)} alle ${item.time}`).join(" oppure ")}.`;
       } else if ((analysis.intent === "spostamento" || analysis.intent === "richiesta_disponibilita") && options.length) {
         action = "Agenda consultata e nuove disponibilita' proposte";
         operationalReply = `Ciao ${selectedPatient.name.split(" ")[0]}, abbiamo controllato l'agenda. Le prime disponibilita' compatibili sono ${options.slice(0, 2).map((item) => `${formatDate(item.date)} alle ${item.time}`).join(" oppure ")}. Quale preferisci?`;
       } else if (analysis.intent === "conferma") {
         action = "Conferma registrata";
-      } else if (analysis.intent === "rinuncia" && !exactAppointment) {
-        action = "Richiesto chiarimento prima di modificare l'agenda";
-        operationalReply = `Ciao ${selectedPatient.name.split(" ")[0]}, per sicurezza ci confermi data e orario dell'appuntamento da annullare?`;
+      } else if (isCancellation && !cancellationTarget.appointment) {
+        action = "Agenda consultata e nuova disponibilita' proposta";
+        operationalReply = `Ciao ${selectedPatient.name.split(" ")[0]}, abbiamo ricevuto la rinuncia e controllato l'agenda. Non risultano appuntamenti attivi associati al tuo contatto; ti proponiamo comunque queste disponibilita': ${options.slice(0, 2).map((item) => `${formatDate(item.date)} alle ${item.time}`).join(" oppure ")}.`;
       }
 
       const entry = {
@@ -1256,7 +1277,7 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
         reply: operationalReply,
         engine: payload.usedGemini ? "Gemini backend" : payload.usedOpenAI ? "OpenAI backend" : "Fallback locale",
       };
-      setResult({ ...analysis, action, reply: operationalReply, engine: entry.engine });
+      setResult({ ...finalAnalysis, action, reply: operationalReply, engine: entry.engine });
       setLog((current) => [entry, ...current].slice(0, 12));
     } catch (error) {
       setResult({
