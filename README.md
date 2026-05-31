@@ -1,6 +1,18 @@
-# Demo Studio Dentistico
+# Studio Dentistico
 
 Demo front-end operativa per uno studio dentistico, focalizzata su simulazione agenda, Fill the Gap, follow-up pazienti, preventivi e messaggi.
+
+Include anche una seconda webapp separata pensata come base prodotto:
+
+```text
+/prodotto.html
+```
+
+Su Vercel con clean URL e' raggiungibile anche da:
+
+```text
+/prodotto
+```
 
 ## Avvio locale
 
@@ -17,6 +29,12 @@ http://localhost:5173
 ```
 
 La demo usa dati mock e simula tutte le automazioni lato front-end.
+
+Per aprire la versione prodotto:
+
+```text
+http://localhost:5173/prodotto.html
+```
 
 ## WhatsApp reale per colloquio
 
@@ -50,6 +68,25 @@ Quando il messaggio di rinuncia arriva al WhatsApp collegato come studio, la dem
 ## Deploy
 
 Il progetto è pronto per hosting statico.
+
+## Variabili ambiente produzione
+
+Per la lettura AI dei messaggi puoi riutilizzare la stessa chiave Gemini usata nella demo. Per produzione e' meglio creare una chiave dedicata al prodotto, con restrizioni e rotazione.
+
+```text
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-3.5-flash
+WHATSAPP_ACCESS_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+WHATSAPP_VERIFY_TOKEN=
+WHATSAPP_AUTOREPLY=true
+```
+
+Webhook WhatsApp Business:
+
+```text
+https://tuo-dominio/api/whatsapp-webhook
+```
 
 ### Vercel
 

@@ -127,7 +127,7 @@ function analyzeLocally(message, patientName) {
       confidenceScore: 0.74,
       detected,
       actionTitle: "Cerca slot compatibili in agenda",
-      actionDetail: "Il sistema filtra agenda, fascia preferita e canale del paziente, poi propone due opzioni libere.",
+      actionDetail: "Il sistema filtra agenda, fascia preferita e storico WhatsApp del paziente, poi propone due opzioni libere.",
       reply: `Ciao ${firstName}, abbiamo trovato due opzioni compatibili: martedi alle 15:30 oppure giovedi alle 17:00. Quale preferisci?`,
       status: "Disponibilita' proposte",
       operations: operationsForIntent("richiesta_disponibilita"),
@@ -450,6 +450,42 @@ async function callGemini({ message, patientName, context, fallback }) {
   return null;
 }
 
+async function analyzeIncomingMessage({ message = "", patientName = "Paziente", context = {} }) {
+  const fallback = normalizeAnalysis(analyzeLocally(message, patientName), analyzeLocally(message, patientName), patientName);
+
+  try {
+    const geminiAnalysis = await callGemini({ message, patientName, context, fallback });
+    if (geminiAnalysis) {
+      return { usedOpenAI: false, usedGemini: true, analysis: normalizeAnalysis(geminiAnalysis, fallback, patientName) };
+    }
+  } catch (error) {
+    if (!process.env.OPENAI_API_KEY) {
+      return {
+        usedOpenAI: false,
+        usedGemini: false,
+        warning: "Gemini non disponibile: usato fallback locale.",
+        analysis: normalizeAnalysis({ ...fallback, backendError: "Gemini non disponibile: uso fallback locale." }, fallback, patientName),
+      };
+    }
+  }
+
+  try {
+    const aiAnalysis = await callOpenAI({ message, patientName, context, fallback });
+    if (aiAnalysis) {
+      return { usedOpenAI: true, usedGemini: false, analysis: normalizeAnalysis(aiAnalysis, fallback, patientName) };
+    }
+  } catch (error) {
+    return {
+      usedOpenAI: false,
+      usedGemini: false,
+      warning: "OpenAI non disponibile: usato fallback locale.",
+      analysis: normalizeAnalysis({ ...fallback, backendError: "OpenAI non disponibile: uso fallback locale." }, fallback, patientName),
+    };
+  }
+
+  return { usedOpenAI: false, usedGemini: false, analysis: fallback };
+}
+
 async function readJsonBody(req) {
   if (req.body && typeof req.body === "object") return req.body;
   if (typeof req.body === "string") {
@@ -486,44 +522,11 @@ module.exports = async function handler(req, res) {
   try {
     const body = await readJsonBody(req);
     const { message = "", patientName = "Paziente", context = {} } = body || {};
-    const fallback = normalizeAnalysis(analyzeLocally(message, patientName), analyzeLocally(message, patientName), patientName);
-
-    try {
-      const geminiAnalysis = await callGemini({ message, patientName, context, fallback });
-      if (geminiAnalysis) {
-        res.status(200).json({ usedOpenAI: false, usedGemini: true, analysis: normalizeAnalysis(geminiAnalysis, fallback, patientName) });
-        return;
-      }
-    } catch (error) {
-      if (!process.env.OPENAI_API_KEY) {
-        res.status(200).json({
-          usedOpenAI: false,
-          usedGemini: false,
-          warning: "Gemini non disponibile: usato fallback locale.",
-          analysis: normalizeAnalysis({ ...fallback, backendError: "Gemini non disponibile: uso fallback locale." }, fallback, patientName),
-        });
-        return;
-      }
-    }
-
-    try {
-      const aiAnalysis = await callOpenAI({ message, patientName, context, fallback });
-      if (aiAnalysis) {
-        res.status(200).json({ usedOpenAI: true, usedGemini: false, analysis: normalizeAnalysis(aiAnalysis, fallback, patientName) });
-        return;
-      }
-    } catch (error) {
-      res.status(200).json({
-        usedOpenAI: false,
-        usedGemini: false,
-        warning: "OpenAI non disponibile: usato fallback locale.",
-        analysis: normalizeAnalysis({ ...fallback, backendError: "OpenAI non disponibile: uso fallback locale." }, fallback, patientName),
-      });
-      return;
-    }
-
-    res.status(200).json({ usedOpenAI: false, usedGemini: false, analysis: fallback });
+    const result = await analyzeIncomingMessage({ message, patientName, context });
+    res.status(200).json(result);
   } catch (error) {
     res.status(500).json({ error: "Analisi messaggio non riuscita" });
   }
 };
+
+module.exports.analyzeIncomingMessage = analyzeIncomingMessage;
