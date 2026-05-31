@@ -1,5 +1,14 @@
 const { analyzeIncomingMessage } = require("./analyze-message");
-const { sendWhatsAppText } = require("./whatsapp-send");
+const {
+  appendWhatsAppEvent,
+  getProductState,
+  saveProductState,
+} = require("./_product-store");
+const {
+  ensurePatient,
+  updateStateForIncomingMessage,
+} = require("./_product-engine");
+const { maybeSendWhatsAppText } = require("./whatsapp-send");
 
 async function readJsonBody(req) {
   if (req.body && typeof req.body === "object") return req.body;
@@ -84,38 +93,107 @@ async function handler(req, res) {
     const processed = [];
 
     for (const message of messages) {
+      const stateResult = await getProductState();
+      let state = stateResult.state;
+      if (!state) {
+        const reply = "Sistema in configurazione: l'agenda dello studio non e' ancora collegata. Riprova piu' tardi.";
+        const sendResult = await maybeSendWhatsAppText({ to: message.from, text: reply });
+        processed.push({
+          messageId: message.id,
+          from: message.from,
+          patientName: message.patientName,
+          intent: "configurazione_mancante",
+          reply,
+          sent: !sendResult.dryRun,
+          dryRun: sendResult.dryRun,
+          error: "Database vuoto: apri /prodotto una volta o salva lo stato iniziale.",
+        });
+        continue;
+      }
+
+      const patientResult = ensurePatient(state, message.from, message.patientName);
+      state = patientResult.state;
+      const patient = patientResult.patient;
       const analysisResult = await analyzeIncomingMessage({
         message: message.text,
-        patientName: message.patientName,
+        patientName: patient.name,
         context: {
           source: "whatsapp-cloud-webhook",
           whatsappFrom: message.from,
-          note: "Collegare qui database pazienti e agenda per modifiche persistenti.",
+          appointments: (state.appointments || []).filter((appointment) => appointment.patientId === patient.id),
         },
       });
 
-      const reply = analysisResult.analysis?.reply;
-      let sent = false;
-      let sendError = null;
+      const operation = updateStateForIncomingMessage({
+        state,
+        patient,
+        messageText: message.text,
+        analysis: analysisResult.analysis || {},
+      });
+      state = operation.state;
 
-      if (reply && process.env.WHATSAPP_AUTOREPLY !== "false") {
+      let sent = false;
+      let dryRun = true;
+      let sendError = null;
+      const outbound = [];
+
+      if (operation.reply && process.env.WHATSAPP_AUTOREPLY !== "false") {
         try {
-          await sendWhatsAppText({ to: message.from, text: reply });
-          sent = true;
+          const sendResult = await maybeSendWhatsAppText({ to: message.from, text: operation.reply });
+          sent = !sendResult.dryRun;
+          dryRun = Boolean(sendResult.dryRun);
+          outbound.push({ to: message.from, text: operation.reply, dryRun: sendResult.dryRun, reason: "Risposta al paziente" });
         } catch (error) {
           sendError = error.message || "Invio non riuscito";
         }
       }
 
+      const campaignMode = process.env.WHATSAPP_CAMPAIGNS_MODE || "dry-run";
+      if (Array.isArray(operation.campaignMessages) && operation.campaignMessages.length) {
+        for (const campaignMessage of operation.campaignMessages) {
+          try {
+            const sendResult = await maybeSendWhatsAppText({
+              to: campaignMessage.to,
+              text: campaignMessage.text,
+              mode: campaignMode,
+            });
+            outbound.push({ ...campaignMessage, dryRun: sendResult.dryRun });
+          } catch (error) {
+            outbound.push({ ...campaignMessage, dryRun: false, error: error.message || "Invio campagna non riuscito" });
+          }
+        }
+      }
+
+      state = {
+        ...state,
+        outboundQueue: [...outbound, ...(Array.isArray(state.outboundQueue) ? state.outboundQueue : [])].slice(0, 50),
+      };
+      await saveProductState(state);
+
+      await appendWhatsAppEvent({
+        id: message.id || `event-${Date.now()}`,
+        fromPhone: message.from,
+        patientName: patient.name,
+        messageText: message.text,
+        analysis: analysisResult.analysis,
+        action: operation.action,
+        reply: operation.reply,
+        sent,
+        error: sendError,
+      });
+
       processed.push({
         messageId: message.id,
         from: message.from,
-        patientName: message.patientName,
+        patientName: patient.name,
         intent: analysisResult.analysis?.intent,
         intentLabel: analysisResult.analysis?.intentLabel,
-        reply,
+        action: operation.action,
+        reply: operation.reply,
         sent,
+        dryRun,
         sendError,
+        outbound,
         usedGemini: analysisResult.usedGemini,
       });
     }

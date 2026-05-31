@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const NAV_ITEMS = [
   { id: "agenda", label: "Agenda", icon: "📅", preview: "Calendario annuale, appuntamenti e rinunce." },
@@ -613,7 +613,7 @@ function Sidebar({ activeSection, setActiveSection, setHome }) {
   );
 }
 
-function AppShell({ activeSection, setActiveSection, children }) {
+function AppShell({ activeSection, setActiveSection, backendStatus, children }) {
   const active = NAV_ITEMS.find((item) => item.id === activeSection);
   return (
     <div className="min-h-screen bg-[#f6f8fb] text-slate-950">
@@ -628,6 +628,7 @@ function AppShell({ activeSection, setActiveSection, children }) {
             <Button variant="secondary" onClick={() => setActiveSection("home")}>
               Home
             </Button>
+            <Pill tone={backendStatus?.configured ? "green" : "amber"}>{backendStatus?.configured ? "Database collegato" : "Database non collegato"}</Pill>
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
@@ -1213,7 +1214,7 @@ function AutomationsSection({ automations, setAutomations }) {
   );
 }
 
-function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap, log, setLog }) {
+function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap, log, setLog, backendStatus, outboundQueue }) {
   const [studioPhone, setStudioPhone] = useStoredState("studioflow-whatsapp-phone", "393331234567");
   const [selectedPatientId, setSelectedPatientId] = useState(patients[0]?.id || "");
   const [message, setMessage] = useState("Non posso piu' venire all'appuntamento di oggi alle 16:00.");
@@ -1339,7 +1340,10 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
               <h2 className="text-xl font-bold">Motore messaggi in ingresso</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">La stessa logica viene usata dal webhook WhatsApp: comprende il messaggio, consulta agenda e produce l'azione successiva.</p>
             </div>
-            <Pill tone="teal">Gemini API</Pill>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Pill tone="teal">Gemini API</Pill>
+              <Pill tone={backendStatus?.configured ? "green" : "amber"}>{backendStatus?.configured ? "DB attivo" : "DB da collegare"}</Pill>
+            </div>
           </div>
           <div className="mt-5 grid gap-4">
             <Field label="Contatto WhatsApp">
@@ -1369,6 +1373,19 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
 
       <Panel className="mt-6 p-6">
         <h2 className="text-xl font-bold">Registro operativo</h2>
+        {Array.isArray(outboundQueue) && outboundQueue.length ? (
+          <div className="mt-4 rounded-2xl border border-teal-100 bg-teal-50 p-4">
+            <div className="text-sm font-bold text-teal-800">Coda WhatsApp generata dal bot</div>
+            <div className="mt-3 space-y-2">
+              {outboundQueue.slice(0, 4).map((item, index) => (
+                <div key={`${item.to}-${index}`} className="rounded-xl bg-white p-3 text-sm text-slate-700">
+                  <div className="font-semibold">{item.reason || "Messaggio automatico"} · {item.dryRun ? "dry-run" : "inviato"}</div>
+                  <div className="mt-1 text-slate-500">{item.text}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
         <div className="mt-5 space-y-3">
           {log.length ? (
             log.map((entry) => (
@@ -1396,12 +1413,128 @@ function ProductApp() {
   const [patients, setPatients] = useStoredState("studioflow-patients", INITIAL_PATIENTS);
   const [appointments, setAppointments] = useStoredState("studioflow-appointments", INITIAL_APPOINTMENTS);
   const [waitlist, setWaitlist] = useStoredState("studioflow-waitlist", INITIAL_WAITLIST);
-  const [quotes] = useStoredState("studioflow-quotes", INITIAL_QUOTES);
+  const [quotes, setQuotes] = useStoredState("studioflow-quotes", INITIAL_QUOTES);
   const [rules, setRules] = useStoredState("studioflow-rules", INITIAL_RULES);
   const [automations, setAutomations] = useStoredState("studioflow-automations", INITIAL_AUTOMATIONS);
   const [gaps, setGaps] = useStoredState("studioflow-gaps", []);
   const [log, setLog] = useStoredState("studioflow-log", []);
+  const [outboundQueue, setOutboundQueue] = useStoredState("studioflow-outbound-queue", []);
+  const [backendStatus, setBackendStatus] = useState({ checked: false, configured: false, needsSeed: false, updatedAt: null });
   const [selectedDate, setSelectedDate] = useState(todayISO());
+  const applyingRemoteRef = useRef(false);
+  const saveTimerRef = useRef(null);
+
+  const makeProductState = () => ({
+    patients,
+    appointments,
+    waitlist,
+    quotes,
+    rules,
+    automations,
+    gaps,
+    log,
+    outboundQueue,
+  });
+
+  const applyProductState = (state) => {
+    if (!state || typeof state !== "object") return;
+    applyingRemoteRef.current = true;
+    if (Array.isArray(state.patients)) setPatients(state.patients);
+    if (Array.isArray(state.appointments)) setAppointments(state.appointments);
+    if (Array.isArray(state.waitlist)) setWaitlist(state.waitlist);
+    if (Array.isArray(state.quotes)) setQuotes(state.quotes);
+    if (Array.isArray(state.rules)) setRules(state.rules);
+    if (Array.isArray(state.automations)) setAutomations(state.automations);
+    if (Array.isArray(state.gaps)) setGaps(state.gaps);
+    if (Array.isArray(state.log)) setLog(state.log);
+    if (Array.isArray(state.outboundQueue)) setOutboundQueue(state.outboundQueue);
+    window.setTimeout(() => {
+      applyingRemoteRef.current = false;
+    }, 0);
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadBackendState() {
+      try {
+        const response = await fetch("/api/product-state", { cache: "no-store" });
+        const payload = await response.json();
+        if (cancelled) return;
+        setBackendStatus({
+          checked: true,
+          configured: Boolean(payload.configured),
+          needsSeed: Boolean(payload.needsSeed),
+          updatedAt: payload.updatedAt || null,
+        });
+
+        if (payload.configured && payload.state) {
+          applyProductState(payload.state);
+        } else if (payload.configured && payload.needsSeed) {
+          await fetch("/api/product-state", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ state: makeProductState() }),
+          });
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setBackendStatus({ checked: true, configured: false, needsSeed: false, updatedAt: null, error: "Database non raggiungibile" });
+        }
+      }
+    }
+
+    loadBackendState();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!backendStatus.configured || applyingRemoteRef.current) return undefined;
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/product-state", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ state: makeProductState() }),
+        });
+        const payload = await response.json();
+        if (payload.ok) {
+          setBackendStatus((current) => ({ ...current, updatedAt: payload.updatedAt || current.updatedAt, needsSeed: false }));
+        }
+      } catch (error) {
+        setBackendStatus((current) => ({ ...current, error: "Salvataggio database non riuscito" }));
+      } finally {
+        saveTimerRef.current = null;
+      }
+    }, 700);
+
+    return () => {
+      if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    };
+  }, [patients, appointments, waitlist, quotes, rules, automations, gaps, log, outboundQueue, backendStatus.configured]);
+
+  useEffect(() => {
+    if (!backendStatus.configured) return undefined;
+    const interval = window.setInterval(async () => {
+      if (applyingRemoteRef.current || saveTimerRef.current) return;
+      try {
+        const response = await fetch("/api/product-state", { cache: "no-store" });
+        const payload = await response.json();
+        if (payload.configured && payload.state && payload.updatedAt && payload.updatedAt !== backendStatus.updatedAt) {
+          setBackendStatus((current) => ({ ...current, updatedAt: payload.updatedAt, needsSeed: false }));
+          applyProductState(payload.state);
+        }
+      } catch (error) {
+        setBackendStatus((current) => ({ ...current, error: "Aggiornamento database non riuscito" }));
+      }
+    }, 8000);
+
+    return () => window.clearInterval(interval);
+  }, [backendStatus.configured, backendStatus.updatedAt]);
 
   const createGap = (appointment) => {
     setGaps((current) => {
@@ -1470,7 +1603,7 @@ function ProductApp() {
   }
 
   return (
-    <AppShell activeSection={activeSection} setActiveSection={setActiveSection}>
+    <AppShell activeSection={activeSection} setActiveSection={setActiveSection} backendStatus={backendStatus}>
       {activeSection === "agenda" ? (
         <AgendaSection
           patients={patients}
@@ -1498,6 +1631,8 @@ function ProductApp() {
           onCreateGap={createGap}
           log={log}
           setLog={setLog}
+          backendStatus={backendStatus}
+          outboundQueue={outboundQueue}
         />
       ) : null}
     </AppShell>

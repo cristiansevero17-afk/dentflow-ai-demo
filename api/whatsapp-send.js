@@ -67,6 +67,26 @@ async function sendWhatsAppText({ to, text }) {
   return payload;
 }
 
+function isWhatsAppLiveMode() {
+  return process.env.WHATSAPP_SEND_MODE === "live";
+}
+
+async function maybeSendWhatsAppText({ to, text, mode = process.env.WHATSAPP_SEND_MODE || "dry-run" }) {
+  if (mode !== "live") {
+    return {
+      dryRun: true,
+      to: normalizePhone(to),
+      text,
+    };
+  }
+
+  const payload = await sendWhatsAppText({ to, text });
+  return {
+    dryRun: false,
+    payload,
+  };
+}
+
 async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -84,4 +104,6 @@ async function handler(req, res) {
 }
 
 module.exports = handler;
+module.exports.isWhatsAppLiveMode = isWhatsAppLiveMode;
+module.exports.maybeSendWhatsAppText = maybeSendWhatsAppText;
 module.exports.sendWhatsAppText = sendWhatsAppText;

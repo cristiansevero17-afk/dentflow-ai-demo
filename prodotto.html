@@ -37,7 +37,7 @@
         let source = await response.text();
 
         source = source
-          .replace(/import\s+\{\s*useEffect,\s*useMemo,\s*useState\s*\}\s+from\s+"react";/, "const { useEffect, useMemo, useState } = React;")
+          .replace(/import\s+\{\s*useEffect,\s*useMemo,\s*useRef,\s*useState\s*\}\s+from\s+"react";/, "const { useEffect, useMemo, useRef, useState } = React;")
           .replace("export default function ProdottoStudioDentistico", "function ProdottoStudioDentistico");
 
         const root = document.getElementById("root");

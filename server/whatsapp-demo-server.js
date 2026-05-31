@@ -5,6 +5,9 @@ const cors = require("cors");
 const qrcode = require("qrcode");
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const analyzeMessageHandler = require("../api/analyze-message");
+const productStateHandler = require("../api/product-state");
+const whatsappWebhookHandler = require("../api/whatsapp-webhook");
+const whatsappSendHandler = require("../api/whatsapp-send");
 
 const rootDir = path.resolve(__dirname, "..");
 const port = Number(process.env.WHATSAPP_DEMO_PORT || 8787);
@@ -169,6 +172,11 @@ app.get("/api/whatsapp/status", (_req, res) => {
 });
 
 app.post("/api/analyze-message", analyzeMessageHandler);
+app.get("/api/product-state", productStateHandler);
+app.post("/api/product-state", productStateHandler);
+app.get("/api/whatsapp-webhook", whatsappWebhookHandler);
+app.post("/api/whatsapp-webhook", whatsappWebhookHandler);
+app.post("/api/whatsapp-send", whatsappSendHandler);
 
 app.post("/api/whatsapp/connect", async (_req, res) => {
   const current = await ensureClient();

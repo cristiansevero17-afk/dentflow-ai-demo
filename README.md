@@ -76,10 +76,14 @@ Per la lettura AI dei messaggi puoi riutilizzare la stessa chiave Gemini usata n
 ```text
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-3.5-flash
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
 WHATSAPP_ACCESS_TOKEN=
 WHATSAPP_PHONE_NUMBER_ID=
 WHATSAPP_VERIFY_TOKEN=
 WHATSAPP_AUTOREPLY=true
+WHATSAPP_SEND_MODE=dry-run
+WHATSAPP_CAMPAIGNS_MODE=dry-run
 ```
 
 Webhook WhatsApp Business:
@@ -101,7 +105,34 @@ Per testare il bot automatico reale:
 5. Iscriviti all'evento `messages`.
 6. Scrivi allo studio da un secondo numero WhatsApp usato come cliente.
 
-Quando arriva una rinuncia, il webhook passa il testo a Gemini, prepara la risposta e invia automaticamente il messaggio tramite WhatsApp Cloud API. Per rendere persistenti agenda, pazienti e Fill the Gap in produzione serve poi collegare un database.
+Quando arriva una rinuncia, il webhook passa il testo a Gemini, prepara la risposta, aggiorna database, agenda, log e Fill the Gap, poi invia o prepara i messaggi WhatsApp in base alla modalita' scelta.
+
+## Database prodotto
+
+Per il test reale usa Supabase:
+
+1. Crea un progetto Supabase.
+2. Apri SQL Editor e lancia il file `supabase-schema.sql`.
+3. Copia in Vercel `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY`.
+4. Apri `/prodotto` una volta: la webapp salva lo stato iniziale nel database.
+
+La webapp legge e salva lo stesso stato usato dal webhook WhatsApp: agenda, pazienti, lista d'attesa, Fill the Gap, log e coda messaggi.
+
+Per evitare invii indesiderati, la modalita' predefinita e':
+
+```text
+WHATSAPP_SEND_MODE=dry-run
+WHATSAPP_CAMPAIGNS_MODE=dry-run
+```
+
+Quando vuoi inviare messaggi WhatsApp reali, cambia consapevolmente:
+
+```text
+WHATSAPP_SEND_MODE=live
+WHATSAPP_CAMPAIGNS_MODE=live
+```
+
+Usa `live` solo con numeri controllati: Meta puo' applicare costi e policy WhatsApp Business.
 
 ### Vercel
 
