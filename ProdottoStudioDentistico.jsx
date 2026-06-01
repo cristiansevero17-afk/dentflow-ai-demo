@@ -628,7 +628,6 @@ function AppShell({ activeSection, setActiveSection, backendStatus, children }) 
             <Button variant="secondary" onClick={() => setActiveSection("home")}>
               Home
             </Button>
-            <Pill tone={backendStatus?.configured ? "green" : "amber"}>{backendStatus?.configured ? "Database collegato" : "Database non collegato"}</Pill>
           </div>
         </header>
         <main className="mx-auto max-w-7xl px-6 py-8">{children}</main>
