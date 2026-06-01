@@ -21,7 +21,7 @@ function extractMessageSignals(message) {
   const preference =
     normalized.includes("pomeriggio") ? "Pomeriggio" :
     normalized.includes("mattina") ? "Mattina" :
-    normalized.includes("sera") || normalized.includes("dopo le") ? "Tardo pomeriggio" :
+    normalized.includes("sera") || normalized.includes("dopo le") ? "Dopo le 16:00" :
     normalized.includes("anticip") ? "Anticipo richiesto" :
     "";
 
@@ -63,7 +63,7 @@ function analyzeLocally(message, patientName) {
   const hasAppointmentReference = includesAny(normalized, ["appuntamento", "visita", "igiene", "controllo", "seduta", "prenotazione"]);
   const hasCancellation = includesAny(normalized, ["non posso", "non riesco", "non ce la faccio", "non ci sono", "rinunc", "annull", "disdett", "cancell", "non vengo", "impossibile venire", "devo saltare"]);
   const hasReschedule = includesAny(normalized, ["anticip", "spost", "posticip", "cambiare", "cambio", "altro orario", "quell'orario", "quel orario", "rimand", "riprogram"]);
-  const hasAvailability = includesAny(normalized, ["posto libero", "disponibil", "avete un posto", "c'e posto", "ce posto", "settimana prossima", "prenotare", "quando avete", "slot libero"]);
+  const hasAvailability = includesAny(normalized, ["posto", "disponibil", "avete un posto", "avete posto", "c'e posto", "ce posto", "settimana prossima", "prenotare", "quando avete", "slot libero"]);
   const hasQuote = includesAny(normalized, ["preventivo", "prezzo", "costo", "dottore", "implant", "chiarimento"]);
   const hasConfirmation = includesAny(normalized, ["confermo", "ok", "va bene", "ci sono", "si confermo", "si, confermo"]);
   const firstName = String(patientName || "Paziente").split(" ")[0] || "Paziente";

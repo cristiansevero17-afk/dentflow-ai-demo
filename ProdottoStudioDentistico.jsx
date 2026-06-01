@@ -32,8 +32,14 @@ const TREATMENTS = ["Igiene dentale", "Controllo", "Sbiancamento", "Implantologi
 const TIME_PREFERENCES = ["Mattina", "Pausa pranzo", "Pomeriggio", "Dopo le 16:00", "Sera"];
 
 function todayISO() {
-  const date = new Date();
-  return toISODate(date);
+  const parts = new Intl.DateTimeFormat("it-IT", {
+    timeZone: "Europe/Rome",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
 }
 
 function toISODate(date) {
@@ -102,6 +108,69 @@ function timeBucket(time) {
   if (hour < 16) return "Pomeriggio";
   if (hour < 19) return "Dopo le 16:00";
   return "Sera";
+}
+
+function requestText(messageText, analysis) {
+  const detectedText = Array.isArray(analysis?.detected) ? analysis.detected.join(" ") : "";
+  return normalizeText(`${messageText || ""} ${detectedText}`);
+}
+
+function nextWeekdayDate(targetDay, fromDate = todayISO(), forceNextWeek = false) {
+  const days = {
+    domenica: 0,
+    lunedi: 1,
+    martedi: 2,
+    mercoledi: 3,
+    giovedi: 4,
+    venerdi: 5,
+    sabato: 6,
+  };
+  const target = days[normalizeText(targetDay)];
+  if (typeof target !== "number") return fromDate;
+
+  const current = fromISODate(fromDate).getDay();
+  let offset = (target - current + 7) % 7;
+  if (offset === 0 || forceNextWeek) offset += 7;
+  return addDays(fromDate, offset);
+}
+
+function resolveRequestedStartDate(messageText, analysis) {
+  const text = requestText(messageText, analysis);
+  const months = MONTHS.map((month) => normalizeText(month));
+  const explicitDate = text.match(/\b(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b/);
+  const today = todayISO();
+
+  if (text.includes("dopodomani")) return addDays(today, 2);
+  if (text.includes("domani")) return addDays(today, 1);
+  if (text.includes("oggi")) return today;
+
+  if (explicitDate) {
+    const monthIndex = months.indexOf(explicitDate[2]);
+    const currentYear = Number(today.slice(0, 4));
+    let candidate = toISODate(new Date(currentYear, monthIndex, Number(explicitDate[1])));
+    if (candidate < today) {
+      candidate = toISODate(new Date(currentYear + 1, monthIndex, Number(explicitDate[1])));
+    }
+    return candidate;
+  }
+
+  const weekday = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato"].find((day) => text.includes(day));
+  const nextWeek = text.includes("settimana prossima") || text.includes("prossima settimana");
+  if (weekday) return nextWeekdayDate(weekday, today, nextWeek);
+  if (nextWeek) return nextWeekdayDate("lunedi", today, true);
+
+  return today;
+}
+
+function resolveRequestedPreference(messageText, analysis) {
+  const text = requestText(messageText, analysis);
+  if (text.includes("mattina") || text.includes("mattino") || text.includes("prima delle")) return "Mattina";
+  if (text.includes("pausa pranzo") || text.includes("pranzo")) return "Pausa pranzo";
+  if (text.includes("dopo le 16") || text.includes("dopo le sedici") || text.includes("tardo pomeriggio") || text.includes("sera")) return "Dopo le 16:00";
+  if (text.includes("pomeriggio") || text.includes("pomeridiano")) return "Pomeriggio";
+  const preferenceLine = text.match(/preferenza:\s*([a-z0-9: ]+)/);
+  if (preferenceLine && !preferenceLine[1].includes("non specificata")) return preferenceLine[1].trim();
+  return "";
 }
 
 function makeId(prefix) {
@@ -406,6 +475,19 @@ function buildTopCandidates(patients, slot, waitlist) {
     .slice(0, 10);
 }
 
+function slotMatchesPreference(time, preference = "") {
+  const normalizedPreference = normalizeText(preference);
+  if (!normalizedPreference || normalizedPreference === "non specificata") return true;
+
+  const bucket = timeBucket(time);
+  const hour = Number(String(time || "00:00").slice(0, 2));
+  if (normalizedPreference.includes("mattina")) return bucket === "Mattina";
+  if (normalizedPreference.includes("pausa") || normalizedPreference.includes("pranzo")) return bucket === "Pausa pranzo";
+  if (normalizedPreference.includes("dopo le 16") || normalizedPreference.includes("sera") || normalizedPreference.includes("tardo")) return hour >= 16;
+  if (normalizedPreference.includes("pomeriggio")) return bucket === "Pomeriggio" || hour >= 16;
+  return normalizeText(bucket).includes(normalizedPreference);
+}
+
 function findOpenSlots(appointments, startDate, preference = "") {
   const options = [];
   const workingTimes = ["09:00", "10:30", "12:00", "15:00", "16:30", "18:00"];
@@ -415,7 +497,7 @@ function findOpenSlots(appointments, startDate, preference = "") {
     if (weekday === 0 || weekday === 6) continue;
     for (const time of workingTimes) {
       const taken = appointments.some((appointment) => appointment.date === date && appointment.time === time && appointment.status !== "annullato");
-      const matchesPreference = !preference || preference === "non specificata" || normalizeText(timeBucket(time)).includes(normalizeText(preference));
+      const matchesPreference = slotMatchesPreference(time, preference);
       if (!taken && matchesPreference) {
         options.push({ date, time });
       }
@@ -1232,7 +1314,13 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
       const analysis = payload.analysis || {};
       const ownAppointments = appointments.filter((item) => item.patientId === selectedPatient.id && item.status !== "annullato");
       const cancellationTarget = pickAppointmentForCancellation(ownAppointments, analysis);
-      const options = findOpenSlots(appointments, todayISO(), "");
+      const requestedStartDate = resolveRequestedStartDate(message, analysis);
+      const requestedPreference = resolveRequestedPreference(message, analysis);
+      const preferredOptions = findOpenSlots(appointments, requestedStartDate, requestedPreference);
+      const options = preferredOptions.length ? preferredOptions : findOpenSlots(appointments, requestedStartDate, "");
+      const optionText = options.length
+        ? options.slice(0, 2).map((item) => `${formatDate(item.date)} alle ${item.time}`).join(" oppure ")
+        : "al momento non risultano slot liberi compatibili nei prossimi giorni";
       const isCancellation = analysis.intent === "rinuncia" || isCancellationIntentText(message);
       const finalAnalysis = isCancellation ? { ...analysis, intent: "rinuncia", intentLabel: "Rinuncia appuntamento", confidence: analysis.confidence || "Alta" } : analysis;
       let operationalReply = analysis.reply || `Ciao ${selectedPatient.name.split(" ")[0]}, abbiamo preso in carico la richiesta.`;
@@ -1244,15 +1332,15 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
         onCreateGap(appointmentToFree);
         action = "Slot liberato e Fill the Gap avviato";
         const matchText = cancellationTarget.match === "exact" ? "per l'appuntamento indicato" : "collegandola al tuo prossimo appuntamento registrato in agenda";
-        operationalReply = `Grazie ${selectedPatient.name.split(" ")[0]}, abbiamo registrato la rinuncia ${matchText}: ${formatDate(appointmentToFree.date)} alle ${appointmentToFree.time}. Lo studio sta riorganizzando lo slot; intanto ti proponiamo queste alternative: ${options.slice(0, 2).map((item) => `${formatDate(item.date)} alle ${item.time}`).join(" oppure ")}.`;
+        operationalReply = `Grazie ${selectedPatient.name.split(" ")[0]}, abbiamo registrato la rinuncia ${matchText}: ${formatDate(appointmentToFree.date)} alle ${appointmentToFree.time}. Lo studio sta riorganizzando lo slot; intanto ti proponiamo queste alternative: ${optionText}.`;
       } else if ((analysis.intent === "spostamento" || analysis.intent === "richiesta_disponibilita") && options.length) {
         action = "Agenda consultata e nuove disponibilita' proposte";
-        operationalReply = `Ciao ${selectedPatient.name.split(" ")[0]}, abbiamo controllato l'agenda. Le prime disponibilita' compatibili sono ${options.slice(0, 2).map((item) => `${formatDate(item.date)} alle ${item.time}`).join(" oppure ")}. Quale preferisci?`;
+        operationalReply = `Ciao ${selectedPatient.name.split(" ")[0]}, abbiamo controllato l'agenda. Le prime disponibilita' compatibili sono ${optionText}. Quale preferisci?`;
       } else if (analysis.intent === "conferma") {
         action = "Conferma registrata";
       } else if (isCancellation && !cancellationTarget.appointment) {
         action = "Agenda consultata e nuova disponibilita' proposta";
-        operationalReply = `Ciao ${selectedPatient.name.split(" ")[0]}, abbiamo ricevuto la rinuncia e controllato l'agenda. Non risultano appuntamenti attivi associati al tuo contatto; ti proponiamo comunque queste disponibilita': ${options.slice(0, 2).map((item) => `${formatDate(item.date)} alle ${item.time}`).join(" oppure ")}.`;
+        operationalReply = `Ciao ${selectedPatient.name.split(" ")[0]}, abbiamo ricevuto la rinuncia e controllato l'agenda. Non risultano appuntamenti attivi associati al tuo contatto; ti proponiamo comunque queste disponibilita': ${optionText}.`;
       }
 
       const entry = {
