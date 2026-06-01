@@ -521,13 +521,12 @@ function Textarea({ className = "", ...props }) {
   return <textarea className={`w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-teal-400 focus:ring-4 focus:ring-teal-50 ${className}`} {...props} />;
 }
 
-function SectionHeader({ eyebrow, title, description, right }) {
+function SectionHeader({ eyebrow, title, right }) {
   return (
-    <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div className="max-w-3xl">
         {eyebrow ? <div className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-teal-700">{eyebrow}</div> : null}
         <h1 className="text-[2rem] font-bold tracking-tight text-slate-950">{title}</h1>
-        {description ? <p className="mt-2 text-base leading-7 text-slate-600">{description}</p> : null}
       </div>
       {right}
     </div>
@@ -553,9 +552,6 @@ function HomeScreen({ setActiveSection }) {
           <div className="max-w-4xl">
             <div className="text-xs font-bold uppercase tracking-[0.18em] text-teal-700">Console principale</div>
             <h2 className="mt-3 text-5xl font-bold tracking-tight text-slate-950">Gestione automatica di agenda, WhatsApp e follow-up.</h2>
-            <p className="mt-5 text-lg leading-8 text-slate-600">
-              Ogni sezione serve a far lavorare lo studio su processi reali: appuntamenti, rinunce, richiami, lista d'attesa e bot WhatsApp.
-            </p>
           </div>
 
           <div className="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -623,7 +619,6 @@ function AppShell({ activeSection, setActiveSection, backendStatus, children }) 
           <div className="mx-auto flex h-full max-w-7xl items-center justify-between">
             <div>
               <div className="text-base font-bold text-slate-950">{active?.label || "Home"}</div>
-              <div className="mt-1 text-sm text-slate-500">{active?.preview}</div>
             </div>
             <Button variant="secondary" onClick={() => setActiveSection("home")}>
               Home
@@ -708,7 +703,6 @@ function AgendaSection({ patients, appointments, setAppointments, selectedDate, 
           <div className="mb-4 flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold">{MONTHS[monthIndex]} {currentYear}</h2>
-              <p className="text-sm text-slate-500">Seleziona un giorno per vedere appuntamenti e slot.</p>
             </div>
             <Pill tone="slate">{formatDate(selectedDate)}</Pill>
           </div>
@@ -864,9 +858,6 @@ function FillGapSection({ gaps, patients, appointments, waitlist, onRunGap, onCl
                     <div key={step} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                       <div className="mb-4 h-1.5 w-12 rounded-full bg-teal-600" />
                       <div className="font-bold">{index + 1}. {step}</div>
-                      <div className="mt-2 text-sm leading-6 text-slate-500">
-                        {index === 3 ? "Chiusura invii e messaggio agli altri contatti." : "Processo gestito dal motore operativo."}
-                      </div>
                     </div>
                   ))}
                 </div>
@@ -906,7 +897,6 @@ function FillGapSection({ gaps, patients, appointments, waitlist, onRunGap, onCl
         ) : (
           <Panel className="p-8 text-center">
             <h2 className="text-2xl font-bold">Nessuno slot da riempire</h2>
-            <p className="mx-auto mt-3 max-w-2xl text-slate-600">Quando viene registrata una rinuncia in agenda o arriva da WhatsApp, qui compare automaticamente la procedura Fill the Gap.</p>
           </Panel>
         )}
       </div>
@@ -960,7 +950,6 @@ function FollowUpSection({ patients, rules, setRules }) {
 
         <Panel className="p-6">
           <h2 className="text-xl font-bold">Coda follow-up</h2>
-          <p className="mt-1 text-sm text-slate-500">Pazienti che rispettano le regole attive e hanno consenso WhatsApp.</p>
           <div className="mt-5 space-y-3">
             {duePatients.map((patient) => (
               <div key={patient.id} className="flex items-center justify-between rounded-2xl border border-slate-200 p-4">
@@ -1197,7 +1186,6 @@ function AutomationsSection({ automations, setAutomations }) {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-bold">{automation.label}</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{automation.detail}</p>
               </div>
               <button
                 onClick={() => setAutomations((current) => current.map((item) => (item.id === automation.id ? { ...item, active: !item.active } : item)))}
@@ -1223,7 +1211,6 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
   const selectedPatient = patients.find((patient) => patient.id === selectedPatientId) || patients[0];
   const waUrl = `https://wa.me/${studioPhone.replace(/[^\d]/g, "")}?text=${encodeURIComponent("Buongiorno, vorrei gestire il mio appuntamento.")}`;
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(waUrl)}`;
-  const webhookUrl = typeof window !== "undefined" ? `${window.location.origin}/api/whatsapp-webhook` : "/api/whatsapp-webhook";
 
   const processMessage = async () => {
     if (!selectedPatient || !message.trim()) return;
@@ -1302,9 +1289,6 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <Panel className="p-6">
           <h2 className="text-xl font-bold">Collegamento WhatsApp</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Per automazione reale servono numero Business, webhook Meta e token di accesso. WhatsApp Web con QR non e' stabile su Vercel per un servizio sempre acceso.
-          </p>
           <div className="mt-5 grid gap-4 sm:grid-cols-[1fr_auto]">
             <Field label="Numero studio in formato internazionale">
               <Input value={studioPhone} onChange={(event) => setStudioPhone(event.target.value)} />
@@ -1319,17 +1303,8 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
             <img className="h-36 w-36 rounded-xl border border-slate-200 bg-white p-2" src={qrUrl} alt="QR WhatsApp" />
             <div>
               <div className="font-bold">QR avvio chat</div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Inquadra il QR per aprire la chat dello studio. Per il bot automatico, collega invece WhatsApp Business API.</p>
               <div className="mt-3 break-all text-xs text-slate-500">{waUrl}</div>
             </div>
-          </div>
-          <div className="mt-5 rounded-2xl border border-slate-200 p-4 text-sm leading-6 text-slate-600">
-            Variabili server richieste: <strong>WHATSAPP_ACCESS_TOKEN</strong>, <strong>WHATSAPP_PHONE_NUMBER_ID</strong>, <strong>WHATSAPP_VERIFY_TOKEN</strong>.
-          </div>
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="text-xs font-bold uppercase tracking-wide text-slate-500">Webhook WhatsApp Business</div>
-            <div className="mt-2 break-all rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700">{webhookUrl}</div>
-            <p className="mt-2 text-sm leading-6 text-slate-500">Questo URL riceve i messaggi reali, li passa a Gemini e invia la risposta automatica tramite WhatsApp Cloud API.</p>
           </div>
         </Panel>
 
@@ -1337,11 +1312,6 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold">Motore messaggi in ingresso</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">La stessa logica viene usata dal webhook WhatsApp: comprende il messaggio, consulta agenda e produce l'azione successiva.</p>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Pill tone="teal">Gemini API</Pill>
-              <Pill tone={backendStatus?.configured ? "green" : "amber"}>{backendStatus?.configured ? "DB attivo" : "DB da collegare"}</Pill>
             </div>
           </div>
           <div className="mt-5 grid gap-4">
