@@ -280,6 +280,20 @@ function getGeminiApiKey() {
   ).trim();
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 5500) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function callOpenAI({ message, patientName, context, fallback }) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
@@ -365,11 +379,12 @@ async function callGemini({ message, patientName, context, fallback }) {
     },
   };
 
+  const configuredModel = String(process.env.GEMINI_MODEL || "").trim();
   const models = [
-    process.env.GEMINI_MODEL,
-    "gemini-3.5-flash",
+    configuredModel && !configuredModel.includes("3.5") ? configuredModel : "",
     "gemini-2.5-flash",
     "gemini-2.0-flash",
+    "gemini-1.5-flash",
   ].filter((model, index, list) => model && list.indexOf(model) === index);
 
   const basePayload = {
@@ -389,18 +404,6 @@ async function callGemini({ message, patientName, context, fallback }) {
   let lastError = null;
   const configVariants = [
     {
-      responseFormat: {
-        text: {
-          mimeType: "application/json",
-          schema,
-        },
-      },
-    },
-    {
-      responseMimeType: "application/json",
-      responseJsonSchema: schema,
-    },
-    {
       responseMimeType: "application/json",
       responseSchema: geminiSchemaFromJsonSchema(schema),
     },
@@ -416,14 +419,14 @@ async function callGemini({ message, patientName, context, fallback }) {
         generationConfig,
       };
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      const response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-goog-api-key": apiKey,
         },
         body: JSON.stringify(payload),
-      });
+      }, Number(process.env.AI_REQUEST_TIMEOUT_MS || 5500));
 
       if (!response.ok) {
         const errorText = await response.text();
