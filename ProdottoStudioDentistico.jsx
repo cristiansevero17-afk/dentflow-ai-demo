@@ -92,13 +92,77 @@ function normalizeText(value) {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\bnn\b/g, "non")
+    .replace(/\bn\b/g, "non")
     .replace(/\s+/g, " ")
     .trim();
 }
 
+function words(value) {
+  return normalizeText(value)
+    .replace(/[^a-z0-9: ]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function editDistance(a, b, maxDistance = 2) {
+  if (Math.abs(a.length - b.length) > maxDistance) return maxDistance + 1;
+
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    let best = current[0];
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current[j] = Math.min(previous[j] + 1, current[j - 1] + 1, previous[j - 1] + cost);
+      best = Math.min(best, current[j]);
+    }
+    if (best > maxDistance) return maxDistance + 1;
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+function fuzzyWordMatch(inputWord, targetWord) {
+  const input = normalizeText(inputWord);
+  const target = normalizeText(targetWord);
+  if (!input || !target) return false;
+  if (input === target) return true;
+  if (target.length <= 2) return false;
+  if (input.length <= 3 || target.length <= 3) return editDistance(input, target, 1) <= 1;
+  if (target.length <= 4) return editDistance(input, target, 1) <= 1;
+  return editDistance(input, target, 2) <= 2;
+}
+
+function fuzzyPhraseMatch(text, phrase) {
+  const normalizedText = normalizeText(text);
+  const normalizedPhrase = normalizeText(phrase);
+  if (!normalizedPhrase) return false;
+  if (normalizedText.includes(normalizedPhrase)) return true;
+
+  const textWords = words(normalizedText);
+  const phraseWords = words(normalizedPhrase);
+  if (!phraseWords.length || textWords.length < phraseWords.length) return false;
+
+  for (let i = 0; i <= textWords.length - phraseWords.length; i += 1) {
+    const window = textWords.slice(i, i + phraseWords.length);
+    if (phraseWords.every((phraseWord, index) => fuzzyWordMatch(window[index], phraseWord))) return true;
+  }
+  return false;
+}
+
+function includesFuzzyAny(text, phrases) {
+  return phrases.some((phrase) => fuzzyPhraseMatch(text, phrase));
+}
+
+function findFuzzyWord(text, candidates) {
+  const textWords = words(text);
+  return candidates.find((candidate) => textWords.some((word) => fuzzyWordMatch(word, candidate))) || "";
+}
+
 function isCancellationIntentText(value) {
   const text = normalizeText(value);
-  return ["non posso", "non riesco", "rinunc", "annull", "disdett", "cancell", "non vengo", "devo saltare"].some((keyword) => text.includes(keyword));
+  return includesFuzzyAny(text, ["non posso", "non riesco", "rinuncia", "annullare", "disdire", "disdetta", "cancellare", "non vengo", "devo saltare"]);
 }
 
 function timeBucket(time) {
@@ -137,12 +201,25 @@ function nextWeekdayDate(targetDay, fromDate = todayISO(), forceNextWeek = false
 function resolveRequestedStartDate(messageText, analysis) {
   const text = requestText(messageText, analysis);
   const months = MONTHS.map((month) => normalizeText(month));
-  const explicitDate = text.match(/\b(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b/);
+  const exactDate = text.match(/\b(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b/);
+  const tokens = words(text);
+  let explicitDate = exactDate;
+  if (!explicitDate) {
+    for (let index = 0; index < tokens.length - 1; index += 1) {
+      if (/^\d{1,2}$/.test(tokens[index])) {
+        const month = months.find((candidate) => fuzzyWordMatch(tokens[index + 1], candidate));
+        if (month) {
+          explicitDate = [tokens[index], tokens[index], month];
+          break;
+        }
+      }
+    }
+  }
   const today = todayISO();
 
-  if (text.includes("dopodomani")) return addDays(today, 2);
-  if (text.includes("domani")) return addDays(today, 1);
-  if (text.includes("oggi")) return today;
+  if (includesFuzzyAny(text, ["dopodomani"])) return addDays(today, 2);
+  if (includesFuzzyAny(text, ["domani"])) return addDays(today, 1);
+  if (includesFuzzyAny(text, ["oggi"])) return today;
 
   if (explicitDate) {
     const monthIndex = months.indexOf(explicitDate[2]);
@@ -154,8 +231,8 @@ function resolveRequestedStartDate(messageText, analysis) {
     return candidate;
   }
 
-  const weekday = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato"].find((day) => text.includes(day));
-  const nextWeek = text.includes("settimana prossima") || text.includes("prossima settimana");
+  const weekday = findFuzzyWord(text, ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato"]);
+  const nextWeek = includesFuzzyAny(text, ["settimana prossima", "prossima settimana"]);
   if (weekday) return nextWeekdayDate(weekday, today, nextWeek);
   if (nextWeek) return nextWeekdayDate("lunedi", today, true);
 
@@ -164,10 +241,10 @@ function resolveRequestedStartDate(messageText, analysis) {
 
 function resolveRequestedPreference(messageText, analysis) {
   const text = requestText(messageText, analysis);
-  if (text.includes("mattina") || text.includes("mattino") || text.includes("prima delle")) return "Mattina";
-  if (text.includes("pausa pranzo") || text.includes("pranzo")) return "Pausa pranzo";
-  if (text.includes("dopo le 16") || text.includes("dopo le sedici") || text.includes("tardo pomeriggio") || text.includes("sera")) return "Dopo le 16:00";
-  if (text.includes("pomeriggio") || text.includes("pomeridiano")) return "Pomeriggio";
+  if (includesFuzzyAny(text, ["mattina", "mattino", "prima delle"])) return "Mattina";
+  if (includesFuzzyAny(text, ["pausa pranzo", "pranzo"])) return "Pausa pranzo";
+  if (includesFuzzyAny(text, ["dopo le 16", "dopo le sedici", "tardo pomeriggio", "sera"])) return "Dopo le 16:00";
+  if (includesFuzzyAny(text, ["pomeriggio", "pomeridiano"])) return "Pomeriggio";
   const preferenceLine = text.match(/preferenza:\s*([a-z0-9: ]+)/);
   if (preferenceLine && !preferenceLine[1].includes("non specificata")) return preferenceLine[1].trim();
   return "";
@@ -510,8 +587,8 @@ function findOpenSlots(appointments, startDate, preference = "") {
 function appointmentMatchesRequest(appointment, analysis) {
   const detectedText = Array.isArray(analysis?.detected) ? analysis.detected.join(" ").toLowerCase() : "";
   const hasDate = detectedText.match(/(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)/);
-  const hasTomorrow = detectedText.includes("domani");
-  const hasToday = detectedText.includes("oggi");
+  const hasTomorrow = includesFuzzyAny(detectedText, ["domani"]);
+  const hasToday = includesFuzzyAny(detectedText, ["oggi"]);
   const hasTime = detectedText.match(/(\d{1,2}):(\d{2})/);
   let dateOk = true;
   let timeOk = true;

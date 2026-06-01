@@ -13,21 +13,112 @@ function includesAny(text, keywords) {
   return keywords.some((keyword) => text.includes(keyword));
 }
 
+function words(value) {
+  return normalizeMessageText(value)
+    .replace(/[^a-z0-9: ]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+function editDistance(a, b, maxDistance = 2) {
+  if (Math.abs(a.length - b.length) > maxDistance) return maxDistance + 1;
+
+  let previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  for (let i = 1; i <= a.length; i += 1) {
+    const current = [i];
+    let best = current[0];
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current[j] = Math.min(
+        previous[j] + 1,
+        current[j - 1] + 1,
+        previous[j - 1] + cost
+      );
+      best = Math.min(best, current[j]);
+    }
+    if (best > maxDistance) return maxDistance + 1;
+    previous = current;
+  }
+  return previous[b.length];
+}
+
+function fuzzyWordMatch(inputWord, targetWord) {
+  const input = normalizeMessageText(inputWord);
+  const target = normalizeMessageText(targetWord);
+  if (!input || !target) return false;
+  if (input === target) return true;
+  if (target.length <= 2) return false;
+  if (input.length <= 3 || target.length <= 3) return editDistance(input, target, 1) <= 1;
+  if (target.length <= 4) return editDistance(input, target, 1) <= 1;
+  return editDistance(input, target, 2) <= 2;
+}
+
+function fuzzyPhraseMatch(text, phrase) {
+  const normalizedText = normalizeMessageText(text);
+  const normalizedPhrase = normalizeMessageText(phrase);
+  if (!normalizedPhrase) return false;
+  if (normalizedText.includes(normalizedPhrase)) return true;
+
+  const textWords = words(normalizedText);
+  const phraseWords = words(normalizedPhrase);
+  if (!phraseWords.length || textWords.length < phraseWords.length) return false;
+
+  for (let i = 0; i <= textWords.length - phraseWords.length; i += 1) {
+    const window = textWords.slice(i, i + phraseWords.length);
+    const matched = phraseWords.every((phraseWord, index) => fuzzyWordMatch(window[index], phraseWord));
+    if (matched) return true;
+  }
+  return false;
+}
+
+function includesFuzzyAny(text, phrases) {
+  return phrases.some((phrase) => fuzzyPhraseMatch(text, phrase));
+}
+
+function findFuzzyWord(text, candidates) {
+  const textWords = words(text);
+  return candidates.find((candidate) => textWords.some((word) => fuzzyWordMatch(word, candidate))) || "";
+}
+
+function findExplicitDateSignal(message) {
+  const normalized = normalizeMessageText(message);
+  const exact = normalized.match(/\b(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b/);
+  if (exact) return `${exact[1]} ${exact[2]}`;
+
+  const months = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+  const tokens = words(normalized);
+  for (let index = 0; index < tokens.length - 1; index += 1) {
+    if (/^\d{1,2}$/.test(tokens[index])) {
+      const month = months.find((candidate) => fuzzyWordMatch(tokens[index + 1], candidate));
+      if (month) return `${tokens[index]} ${month}`;
+    }
+  }
+  return "";
+}
+
+function hasConfirmationIntent(text) {
+  const normalized = normalizeMessageText(text);
+  return (
+    /\b(si|ok)\b/.test(normalized) ||
+    includesFuzzyAny(normalized, ["confermo", "confermare", "va bene", "perfetto", "ci sono", "lo prendo", "va benissimo"])
+  );
+}
+
 function extractMessageSignals(message) {
   const normalized = normalizeMessageText(message);
-  const dateMatch = String(message || "").match(/\b(\d{1,2})\s+(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre)\b/i);
+  const explicitDate = findExplicitDateSignal(message);
   const timeMatch = String(message || "").match(/\b(?:alle|ore)?\s*(\d{1,2})(?::|\.)(\d{2})\b|\b(?:alle|ore)\s+(\d{1,2})\b/i);
-  const weekday = ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato"].find((day) => normalized.includes(day));
+  const weekday = findFuzzyWord(normalized, ["lunedi", "martedi", "mercoledi", "giovedi", "venerdi", "sabato"]);
   const preference =
-    normalized.includes("pomeriggio") ? "Pomeriggio" :
-    normalized.includes("mattina") ? "Mattina" :
-    normalized.includes("sera") || normalized.includes("dopo le") ? "Dopo le 16:00" :
-    normalized.includes("anticip") ? "Anticipo richiesto" :
+    includesFuzzyAny(normalized, ["pomeriggio", "pomeridiano"]) ? "Pomeriggio" :
+    includesFuzzyAny(normalized, ["mattina", "mattino"]) ? "Mattina" :
+    includesFuzzyAny(normalized, ["sera", "dopo le", "tardo pomeriggio"]) ? "Dopo le 16:00" :
+    includesFuzzyAny(normalized, ["anticipare", "anticipo"]) ? "Anticipo richiesto" :
     "";
 
   return {
-    date: dateMatch ? `${dateMatch[1]} ${dateMatch[2].toLowerCase()}` : normalized.includes("domani") ? "domani" : normalized.includes("settimana prossima") ? "settimana prossima" : weekday || "",
-    time: timeMatch ? `${timeMatch[1] || timeMatch[3]}:${timeMatch[2] || "00"}` : normalized.includes("quell'orario") || normalized.includes("quel orario") ? "orario gia' prenotato" : "",
+    date: explicitDate || (includesFuzzyAny(normalized, ["dopodomani"]) ? "dopodomani" : includesFuzzyAny(normalized, ["domani"]) ? "domani" : includesFuzzyAny(normalized, ["settimana prossima", "prossima settimana"]) ? "settimana prossima" : weekday || ""),
+    time: timeMatch ? `${timeMatch[1] || timeMatch[3]}:${timeMatch[2] || "00"}` : includesFuzzyAny(normalized, ["quell'orario", "quel orario"]) ? "orario gia' prenotato" : "",
     preference,
   };
 }
@@ -60,12 +151,12 @@ function toneForIntent(intent) {
 function analyzeLocally(message, patientName) {
   const normalized = normalizeMessageText(message);
   const signals = extractMessageSignals(message);
-  const hasAppointmentReference = includesAny(normalized, ["appuntamento", "visita", "igiene", "controllo", "seduta", "prenotazione"]);
-  const hasCancellation = includesAny(normalized, ["non posso", "non riesco", "non ce la faccio", "non ci sono", "rinunc", "annull", "disdett", "cancell", "non vengo", "impossibile venire", "devo saltare"]);
-  const hasReschedule = includesAny(normalized, ["anticip", "spost", "posticip", "cambiare", "cambio", "altro orario", "quell'orario", "quel orario", "rimand", "riprogram"]);
-  const hasAvailability = includesAny(normalized, ["posto", "disponibil", "avete un posto", "avete posto", "c'e posto", "ce posto", "settimana prossima", "prenotare", "quando avete", "slot libero"]);
-  const hasQuote = includesAny(normalized, ["preventivo", "prezzo", "costo", "dottore", "implant", "chiarimento"]);
-  const hasConfirmation = includesAny(normalized, ["confermo", "ok", "va bene", "ci sono", "si confermo", "si, confermo"]);
+  const hasAppointmentReference = includesFuzzyAny(normalized, ["appuntamento", "visita", "igiene", "controllo", "seduta", "prenotazione"]);
+  const hasCancellation = includesFuzzyAny(normalized, ["non posso", "non riesco", "non ce la faccio", "rinuncia", "rinunciare", "annullare", "annullo", "disdire", "disdetta", "cancellare", "non vengo", "impossibile venire", "devo saltare"]);
+  const hasReschedule = includesFuzzyAny(normalized, ["anticipare", "anticipo", "spostare", "spostamento", "posticipare", "posticipo", "cambiare", "cambio", "altro orario", "quell'orario", "quel orario", "rimandare", "riprogrammare"]);
+  const hasAvailability = includesFuzzyAny(normalized, ["posto", "disponibilita", "disponibile", "avete un posto", "avete posto", "c'e posto", "ce posto", "settimana prossima", "prenotare", "quando avete", "slot libero", "orari liberi"]);
+  const hasQuote = includesFuzzyAny(normalized, ["preventivo", "prezzo", "costo", "dottore", "impianto", "implantologia", "chiarimento", "proposta"]);
+  const hasConfirmation = hasConfirmationIntent(normalized);
   const firstName = String(patientName || "Paziente").split(" ")[0] || "Paziente";
   const detected = [
     `Paziente: ${patientName || "Paziente"}`,
@@ -460,8 +551,11 @@ async function callGemini({ message, patientName, context, fallback }) {
 async function analyzeIncomingMessage({ message = "", patientName = "Paziente", context = {} }) {
   const fallback = normalizeAnalysis(analyzeLocally(message, patientName), analyzeLocally(message, patientName), patientName);
   const isOperationallyClear =
-    fallback.confidenceScore >= 0.86 &&
-    ["rinuncia", "spostamento", "conferma", "preventivo"].includes(fallback.intent) &&
+    (
+      (fallback.confidenceScore >= 0.86 && ["rinuncia", "spostamento", "conferma"].includes(fallback.intent)) ||
+      (fallback.confidenceScore >= 0.84 && fallback.intent === "preventivo") ||
+      (fallback.confidenceScore >= 0.74 && fallback.intent === "richiesta_disponibilita")
+    ) &&
     process.env.AI_VALIDATE_HIGH_CONFIDENCE !== "true";
 
   if (isOperationallyClear) {
