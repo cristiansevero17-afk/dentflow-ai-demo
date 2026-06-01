@@ -280,7 +280,7 @@ function getGeminiApiKey() {
   ).trim();
 }
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 5500) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 3000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -412,8 +412,13 @@ async function callGemini({ message, patientName, context, fallback }) {
     },
   ];
 
-  for (const model of models) {
-    for (const generationConfig of configVariants) {
+  const attempts = [];
+  for (const model of models.slice(0, 2)) {
+    attempts.push({ model, generationConfig: configVariants[0] });
+  }
+  if (models[0]) attempts.push({ model: models[0], generationConfig: configVariants[1] });
+
+  for (const { model, generationConfig } of attempts) {
       const payload = {
         ...basePayload,
         generationConfig,
@@ -426,7 +431,7 @@ async function callGemini({ message, patientName, context, fallback }) {
           "x-goog-api-key": apiKey,
         },
         body: JSON.stringify(payload),
-      }, Number(process.env.AI_REQUEST_TIMEOUT_MS || 5500));
+      }, Number(process.env.AI_REQUEST_TIMEOUT_MS || 3000));
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -446,7 +451,6 @@ async function callGemini({ message, patientName, context, fallback }) {
       } catch (error) {
         lastError = error;
       }
-    }
   }
 
   if (lastError) throw lastError;
@@ -455,6 +459,26 @@ async function callGemini({ message, patientName, context, fallback }) {
 
 async function analyzeIncomingMessage({ message = "", patientName = "Paziente", context = {} }) {
   const fallback = normalizeAnalysis(analyzeLocally(message, patientName), analyzeLocally(message, patientName), patientName);
+  const isOperationallyClear =
+    fallback.confidenceScore >= 0.86 &&
+    ["rinuncia", "spostamento", "conferma", "preventivo"].includes(fallback.intent) &&
+    process.env.AI_VALIDATE_HIGH_CONFIDENCE !== "true";
+
+  if (isOperationallyClear) {
+    return {
+      usedOpenAI: false,
+      usedGemini: false,
+      aiSkipped: true,
+      analysis: normalizeAnalysis(
+        {
+          ...fallback,
+          backendNote: "Messaggio operativo ad alta confidenza: azione eseguita subito dal motore locale.",
+        },
+        fallback,
+        patientName
+      ),
+    };
+  }
 
   try {
     const geminiAnalysis = await callGemini({ message, patientName, context, fallback });
