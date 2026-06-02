@@ -121,6 +121,7 @@ async function handler(req, res) {
           source: "whatsapp-cloud-webhook",
           whatsappFrom: message.from,
           appointments: (state.appointments || []).filter((appointment) => appointment.patientId === patient.id),
+          conversation: state.conversations?.[patient.id] || null,
         },
       });
 
@@ -188,6 +189,7 @@ async function handler(req, res) {
         patientName: patient.name,
         intent: analysisResult.analysis?.intent,
         intentLabel: analysisResult.analysis?.intentLabel,
+        analysis: analysisResult.analysis,
         action: operation.action,
         reply: operation.reply,
         sent,

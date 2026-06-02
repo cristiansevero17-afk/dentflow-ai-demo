@@ -1360,7 +1360,7 @@ function AutomationsSection({ automations, setAutomations }) {
   );
 }
 
-function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap, log, setLog, backendStatus, outboundQueue }) {
+function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap, log, setLog, backendStatus, outboundQueue, onRefreshState }) {
   const [studioPhone, setStudioPhone] = useStoredState("studioflow-whatsapp-phone", "393331234567");
   const [selectedPatientId, setSelectedPatientId] = useState(patients[0]?.id || "");
   const [message, setMessage] = useState("Non posso piu' venire all'appuntamento di oggi alle 16:00.");
@@ -1375,6 +1375,50 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
     if (!selectedPatient || !message.trim()) return;
     setLoading(true);
     try {
+      if (backendStatus.configured) {
+        const waId = selectedPatient.phone.replace(/[^\d]/g, "");
+        const response = await fetch("/api/whatsapp-webhook", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            entry: [
+              {
+                changes: [
+                  {
+                    value: {
+                      contacts: [{ wa_id: waId, profile: { name: selectedPatient.name } }],
+                      messages: [
+                        {
+                          id: makeId("ui-message"),
+                          from: waId,
+                          timestamp: String(Math.floor(Date.now() / 1000)),
+                          text: { body: message },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          }),
+        });
+        const webhookPayload = await response.json();
+        const processed = Array.isArray(webhookPayload.processed) ? webhookPayload.processed[0] : null;
+        const analysis = processed?.analysis || {};
+        if (processed) {
+          setResult({
+            ...analysis,
+            intentLabel: analysis.intentLabel || processed.intentLabel || processed.intent || "Messaggio gestito",
+            confidence: analysis.confidence || "Alta",
+            action: processed.action,
+            reply: processed.reply,
+            engine: processed.usedGemini ? "Gemini backend" : processed.usedOpenAI ? "OpenAI backend" : "Motore conversazionale",
+          });
+          await onRefreshState?.();
+          return;
+        }
+      }
+
       const response = await fetch("/api/analyze-message", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1553,6 +1597,7 @@ function ProductApp() {
   const [gaps, setGaps] = useStoredState("studioflow-gaps", []);
   const [log, setLog] = useStoredState("studioflow-log", []);
   const [outboundQueue, setOutboundQueue] = useStoredState("studioflow-outbound-queue", []);
+  const [conversations, setConversations] = useStoredState("studioflow-conversations", {});
   const [backendStatus, setBackendStatus] = useState({ checked: false, configured: false, needsSeed: false, updatedAt: null });
   const [selectedDate, setSelectedDate] = useState(todayISO());
   const applyingRemoteRef = useRef(false);
@@ -1568,6 +1613,7 @@ function ProductApp() {
     gaps,
     log,
     outboundQueue,
+    conversations,
   });
 
   const applyProductState = (state) => {
@@ -1582,6 +1628,7 @@ function ProductApp() {
     if (Array.isArray(state.gaps)) setGaps(state.gaps);
     if (Array.isArray(state.log)) setLog(state.log);
     if (Array.isArray(state.outboundQueue)) setOutboundQueue(state.outboundQueue);
+    if (state.conversations && typeof state.conversations === "object") setConversations(state.conversations);
     window.setTimeout(() => {
       applyingRemoteRef.current = false;
     }, 0);
@@ -1649,7 +1696,21 @@ function ProductApp() {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     };
-  }, [patients, appointments, waitlist, quotes, rules, automations, gaps, log, outboundQueue, backendStatus.configured]);
+  }, [patients, appointments, waitlist, quotes, rules, automations, gaps, log, outboundQueue, conversations, backendStatus.configured]);
+
+  const refreshProductState = async () => {
+    if (!backendStatus.configured) return;
+    try {
+      const response = await fetch("/api/product-state", { cache: "no-store" });
+      const payload = await response.json();
+      if (payload.configured && payload.state) {
+        setBackendStatus((current) => ({ ...current, updatedAt: payload.updatedAt || current.updatedAt, needsSeed: false }));
+        applyProductState(payload.state);
+      }
+    } catch (error) {
+      setBackendStatus((current) => ({ ...current, error: "Aggiornamento database non riuscito" }));
+    }
+  };
 
   useEffect(() => {
     if (!backendStatus.configured) return undefined;
@@ -1767,6 +1828,7 @@ function ProductApp() {
           setLog={setLog}
           backendStatus={backendStatus}
           outboundQueue={outboundQueue}
+          onRefreshState={refreshProductState}
         />
       ) : null}
     </AppShell>

@@ -366,6 +366,115 @@ function getStateParts(state) {
     waitlist: Array.isArray(state?.waitlist) ? state.waitlist : [],
     gaps: Array.isArray(state?.gaps) ? state.gaps : [],
     log: Array.isArray(state?.log) ? state.log : [],
+    conversations: state?.conversations && typeof state.conversations === "object" ? state.conversations : {},
+  };
+}
+
+function getConversation(state, patientId) {
+  const conversations = state?.conversations && typeof state.conversations === "object" ? state.conversations : {};
+  const conversation = conversations[patientId] && typeof conversations[patientId] === "object" ? conversations[patientId] : {};
+  return {
+    history: Array.isArray(conversation.history) ? conversation.history : [],
+    pending: conversation.pending || null,
+  };
+}
+
+function saveConversation(state, patient, { incoming, reply, action, intent, pending }) {
+  const current = getConversation(state, patient.id);
+  const history = [
+    {
+      id: makeId("turn"),
+      at: new Date().toISOString(),
+      incoming,
+      reply,
+      action,
+      intent,
+    },
+    ...current.history,
+  ].slice(0, 12);
+
+  return {
+    ...state,
+    conversations: {
+      ...(state.conversations && typeof state.conversations === "object" ? state.conversations : {}),
+      [patient.id]: {
+        history,
+        pending: pending || null,
+      },
+    },
+  };
+}
+
+function parseRequestedOptionIndex(messageText) {
+  const text = normalizeText(messageText);
+  if (/\b(1|prima|primo)\b/.test(text) || includesFuzzyAny(text, ["la prima", "il primo"])) return 0;
+  if (/\b(2|seconda|secondo)\b/.test(text) || includesFuzzyAny(text, ["la seconda", "il secondo"])) return 1;
+  if (/\b(3|terza|terzo)\b/.test(text) || includesFuzzyAny(text, ["la terza", "il terzo"])) return 2;
+  return -1;
+}
+
+function parseRequestedTime(messageText) {
+  const text = normalizeText(messageText);
+  const match = text.match(/\b(?:alle|ore)?\s*(\d{1,2})(?::|\.)(\d{2})\b|\b(?:alle|ore)\s+(\d{1,2})\b/);
+  if (!match) return "";
+  return `${String(match[1] || match[3]).padStart(2, "0")}:${match[2] || "00"}`;
+}
+
+function pickPendingOption(messageText, pending) {
+  const options = Array.isArray(pending?.options) ? pending.options : [];
+  if (!options.length) return null;
+
+  const index = parseRequestedOptionIndex(messageText);
+  if (index >= 0 && options[index]) return options[index];
+
+  const requestedTime = parseRequestedTime(messageText);
+  if (requestedTime) {
+    return options.find((option) => option.time === requestedTime) || null;
+  }
+
+  return null;
+}
+
+function findSpecificOpenSlot(appointments, startDate, requestedTime) {
+  if (!requestedTime) return null;
+  const hour = Number(String(requestedTime).slice(0, 2));
+  if (Number.isNaN(hour) || hour < 9 || hour >= 19) return null;
+
+  for (let offset = 0; offset < 21; offset += 1) {
+    const date = addDays(startDate, offset);
+    const weekday = fromISODate(date).getDay();
+    if (weekday === 0 || weekday === 6) continue;
+    const taken = appointments.some((appointment) =>
+      appointment.date === date &&
+      appointment.time === requestedTime &&
+      appointment.status !== "annullato" &&
+      appointment.status !== "libero"
+    );
+    if (!taken) return { date, time: requestedTime };
+  }
+  return null;
+}
+
+function isAlternativeRequest(messageText, analysis) {
+  const text = requestText(messageText, analysis);
+  return (
+    /\bno\b/.test(text) ||
+    includesFuzzyAny(text, ["altro", "altra", "altre disponibilita", "hai altro", "avete altro", "non va bene", "non posso", "preferirei"])
+  );
+}
+
+function createAppointmentFromOption({ option, patient, treatment = "Controllo", notes = "Prenotato automaticamente da conversazione WhatsApp." }) {
+  return {
+    id: makeId("a"),
+    date: option.date,
+    time: option.time,
+    notes,
+    phone: patient.phone,
+    status: "confermato",
+    duration: 60,
+    patientId: patient.id,
+    treatment,
+    patientName: patient.name,
   };
 }
 
@@ -373,6 +482,8 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
   const parts = getStateParts(state);
   const firstName = String(patient.name || "Paziente").split(" ")[0] || "Paziente";
   const patientAppointments = parts.appointments.filter((appointment) => appointment.patientId === patient.id);
+  const conversation = getConversation(state, patient.id);
+  const pending = conversation.pending;
   const requestedStartDate = resolveRequestedStartDate(messageText, analysis);
   const requestedPreference = resolveRequestedPreference(messageText, analysis);
   const preferredOptions = findOpenSlots(parts.appointments, requestedStartDate, requestedPreference);
@@ -386,38 +497,100 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
   let action = "Richiesta registrata";
   let reply = analysis.reply || `Ciao ${firstName}, abbiamo preso in carico la richiesta.`;
   let campaignMessages = [];
+  let nextPending = pending || null;
+  let selectedPendingOption = pickPendingOption(messageText, pending);
+  const requestedPendingTime = parseRequestedTime(messageText);
+  const requestedPendingIndex = parseRequestedOptionIndex(messageText);
+  if (pending && requestedPendingTime && !selectedPendingOption) {
+    const pendingBaseDate = Array.isArray(pending.options) && pending.options[0]?.date ? pending.options[0].date : requestedStartDate;
+    selectedPendingOption = findSpecificOpenSlot(parts.appointments, pendingBaseDate, requestedPendingTime);
+  }
+  const pendingWantsAlternatives = pending && isAlternativeRequest(messageText, analysis);
+  const shouldUseFirstPendingOption =
+    pending &&
+    isConfirmation &&
+    Array.isArray(pending.options) &&
+    pending.options[0] &&
+    requestedPendingIndex < 0 &&
+    !requestedPendingTime &&
+    !pendingWantsAlternatives;
 
-  if (isConfirmation) {
-    const openGap = parts.gaps.find((gap) =>
-      gap.status !== "riempito" &&
-      Array.isArray(gap.candidates) &&
-      gap.candidates.some((candidate) => normalizePhone(candidate.phone) === normalizePhone(patient.phone))
-    );
+  const openGap = parts.gaps.find((gap) =>
+    gap.status !== "riempito" &&
+    Array.isArray(gap.candidates) &&
+    gap.candidates.some((candidate) => normalizePhone(candidate.phone) === normalizePhone(patient.phone))
+  );
 
-    if (openGap) {
-      const slot = parts.appointments.find((appointment) => appointment.id === openGap.appointmentId) || openGap.slot;
+  if (isConfirmation && openGap) {
+    const slot = parts.appointments.find((appointment) => appointment.id === openGap.appointmentId) || openGap.slot;
+    nextState = {
+      ...nextState,
+      appointments: parts.appointments.map((appointment) =>
+        appointment.id === slot.id
+          ? { ...appointment, patientId: patient.id, patientName: patient.name, phone: patient.phone, status: "confermato" }
+          : appointment
+      ),
+      gaps: parts.gaps.map((gap) => (gap.id === openGap.id ? { ...gap, status: "riempito", filledBy: patient.name, filledAt: new Date().toISOString() } : gap)),
+    };
+    action = "Conferma ricevuta e slot assegnato";
+    reply = `Perfetto ${firstName}, abbiamo confermato lo slot ${formatDate(slot.date)} alle ${slot.time}. A presto.`;
+    nextPending = null;
+    campaignMessages = openGap.candidates
+      .filter((candidate) => candidate.patientId !== patient.id && candidate.status !== "Non contattare")
+      .map((candidate) => ({
+        to: candidate.phone,
+        text: `Ciao ${candidate.name.split(" ")[0]}, grazie per la disponibilita'. Lo slot e' stato appena occupato; ti ricontatteremo alla prossima apertura compatibile.`,
+        reason: "Chiusura Fill the Gap",
+      }));
+  } else if (pending && (selectedPendingOption || shouldUseFirstPendingOption)) {
+    const option = selectedPendingOption || pending.options[0];
+    if (pending.type === "reschedule" && pending.originalAppointmentId) {
       nextState = {
         ...nextState,
         appointments: parts.appointments.map((appointment) =>
-          appointment.id === slot.id
-            ? { ...appointment, patientId: patient.id, patientName: patient.name, phone: patient.phone, status: "confermato" }
+          appointment.id === pending.originalAppointmentId
+            ? { ...appointment, date: option.date, time: option.time, status: "confermato" }
             : appointment
         ),
-        gaps: parts.gaps.map((gap) => (gap.id === openGap.id ? { ...gap, status: "riempito", filledBy: patient.name, filledAt: new Date().toISOString() } : gap)),
       };
-      action = "Conferma ricevuta e slot assegnato";
-      reply = `Perfetto ${firstName}, abbiamo confermato lo slot ${formatDate(slot.date)} alle ${slot.time}. A presto.`;
-      campaignMessages = openGap.candidates
-        .filter((candidate) => candidate.patientId !== patient.id && candidate.status !== "Non contattare")
-        .map((candidate) => ({
-          to: candidate.phone,
-          text: `Ciao ${candidate.name.split(" ")[0]}, grazie per la disponibilita'. Lo slot e' stato appena occupato; ti ricontatteremo alla prossima apertura compatibile.`,
-          reason: "Chiusura Fill the Gap",
-        }));
+      action = "Appuntamento spostato automaticamente";
+      reply = `Perfetto ${firstName}, abbiamo spostato l'appuntamento a ${formatDate(option.date)} alle ${option.time}. A presto.`;
     } else {
-      action = "Conferma registrata";
-      reply = `Perfetto ${firstName}, conferma registrata.`;
+      const treatment = pending.treatment || (Array.isArray(patient.treatments) && patient.treatments[0]) || "Controllo";
+      const appointment = createAppointmentFromOption({ option, patient, treatment });
+      nextState = {
+        ...nextState,
+        appointments: [appointment, ...parts.appointments],
+      };
+      action = "Nuovo appuntamento prenotato automaticamente";
+      reply = `Perfetto ${firstName}, abbiamo prenotato ${treatment} per ${formatDate(option.date)} alle ${option.time}. A presto.`;
     }
+    nextPending = null;
+  } else if (pending && (requestedPendingTime || requestedPendingIndex >= 0)) {
+    const alternativeText = Array.isArray(pending.options) && pending.options.length
+      ? pending.options.slice(0, 2).map((item) => `${formatDate(item.date)} alle ${item.time}`).join(" oppure ")
+      : optionText;
+    action = "Opzione non disponibile, alternative mantenute";
+    reply = `Ciao ${firstName}, ho controllato l'agenda: l'opzione indicata non risulta libera. Le alternative disponibili sono ${alternativeText}. Puoi rispondere con \"la prima\", \"la seconda\" o con un altro orario.`;
+    nextPending = {
+      ...pending,
+      updatedAt: new Date().toISOString(),
+    };
+  } else if (pending && pendingWantsAlternatives) {
+    const alternativeOptions = options;
+    const alternativeText = alternativeOptions.length
+      ? alternativeOptions.slice(0, 2).map((item) => `${formatDate(item.date)} alle ${item.time}`).join(" oppure ")
+      : "al momento non risultano altre disponibilita' compatibili nei prossimi giorni";
+    nextPending = {
+      ...pending,
+      options: alternativeOptions.slice(0, 5),
+      updatedAt: new Date().toISOString(),
+    };
+    action = "Nuove alternative proposte in base alla conversazione";
+    reply = `Certo ${firstName}, ho controllato altre disponibilita': ${alternativeText}. Puoi rispondere con \"la prima\", \"la seconda\" o con l'orario che preferisci.`;
+  } else if (isConfirmation) {
+    action = "Conferma registrata";
+    reply = `Perfetto ${firstName}, conferma registrata.`;
   } else if (isCancellation) {
     const cancellationTarget = pickAppointmentForCancellation(patientAppointments, analysis);
     if (cancellationTarget.appointment) {
@@ -443,6 +616,13 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
       };
       action = "Slot liberato e Fill the Gap avviato";
       reply = `Grazie ${firstName}, abbiamo registrato la rinuncia per ${formatDate(appointmentToFree.date)} alle ${appointmentToFree.time}. Lo studio sta riorganizzando lo slot; ti proponiamo queste alternative: ${optionText}.`;
+      nextPending = {
+        type: "booking",
+        source: "cancellation_alternatives",
+        treatment: appointmentToFree.treatment,
+        options: options.slice(0, 5),
+        createdAt: new Date().toISOString(),
+      };
       campaignMessages = candidates
         .filter((candidate) => candidate.status !== "Non contattare")
         .slice(0, 10)
@@ -454,10 +634,36 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
     } else {
       action = "Rinuncia ricevuta, nessun appuntamento attivo trovato";
       reply = `Ciao ${firstName}, abbiamo ricevuto la rinuncia. Non risultano appuntamenti attivi associati al tuo contatto; se vuoi ti proponiamo queste disponibilita': ${optionText}.`;
+      nextPending = {
+        type: "booking",
+        source: "cancellation_without_appointment",
+        treatment: (Array.isArray(patient.treatments) && patient.treatments[0]) || "Controllo",
+        options: options.slice(0, 5),
+        createdAt: new Date().toISOString(),
+      };
     }
-  } else if (analysis.intent === "spostamento" || analysis.intent === "richiesta_disponibilita") {
+  } else if (analysis.intent === "spostamento") {
+    const rescheduleTarget = pickAppointmentForCancellation(patientAppointments, analysis);
+    nextPending = {
+      type: rescheduleTarget.appointment ? "reschedule" : "booking",
+      source: "reschedule_request",
+      originalAppointmentId: rescheduleTarget.appointment?.id || null,
+      treatment: rescheduleTarget.appointment?.treatment || (Array.isArray(patient.treatments) && patient.treatments[0]) || "Controllo",
+      options: options.slice(0, 5),
+      createdAt: new Date().toISOString(),
+    };
+    action = "Agenda consultata e spostamento proposto";
+    reply = `Ciao ${firstName}, ho controllato l'agenda. Le prime alternative compatibili sono ${optionText}. Puoi rispondere con \"la prima\", \"la seconda\" o con l'orario che preferisci.`;
+  } else if (analysis.intent === "richiesta_disponibilita") {
+    nextPending = {
+      type: "booking",
+      source: "availability_request",
+      treatment: (Array.isArray(patient.treatments) && patient.treatments[0]) || "Controllo",
+      options: options.slice(0, 5),
+      createdAt: new Date().toISOString(),
+    };
     action = "Agenda consultata e disponibilita' proposte";
-    reply = `Ciao ${firstName}, abbiamo controllato l'agenda. Le prime disponibilita' compatibili sono ${optionText}. Quale preferisci?`;
+    reply = `Ciao ${firstName}, abbiamo controllato l'agenda. Le prime disponibilita' compatibili sono ${optionText}. Puoi rispondere con \"la prima\", \"la seconda\" o con l'orario che preferisci.`;
   }
 
   const logEntry = {
@@ -474,6 +680,13 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
     ...nextState,
     log: [logEntry, ...(Array.isArray(nextState.log) ? nextState.log : parts.log)].slice(0, 30),
   };
+  nextState = saveConversation(nextState, patient, {
+    incoming: messageText,
+    reply,
+    action,
+    intent: analysis.intent,
+    pending: nextPending,
+  });
 
   return { state: nextState, action, reply, campaignMessages };
 }
