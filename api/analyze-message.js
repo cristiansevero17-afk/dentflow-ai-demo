@@ -153,7 +153,27 @@ function analyzeLocally(message, patientName) {
   const signals = extractMessageSignals(message);
   const hasAppointmentReference = includesFuzzyAny(normalized, ["appuntamento", "visita", "igiene", "controllo", "seduta", "prenotazione"]);
   const hasCancellation = includesFuzzyAny(normalized, ["non posso", "non riesco", "non ce la faccio", "rinuncia", "rinunciare", "annullare", "annullo", "disdire", "disdetta", "cancellare", "non vengo", "impossibile venire", "devo saltare"]);
-  const hasReschedule = includesFuzzyAny(normalized, ["anticipare", "anticipo", "spostare", "spostamento", "posticipare", "posticipo", "cambiare", "cambio", "altro orario", "quell'orario", "quel orario", "rimandare", "riprogrammare"]);
+  const hasReschedule = includesFuzzyAny(normalized, [
+    "anticipare",
+    "anticipiamo",
+    "anticipo",
+    "spostare",
+    "spostiamo",
+    "spostamento",
+    "posticipare",
+    "posticipiamo",
+    "posticipo",
+    "cambiare",
+    "cambiamo",
+    "cambio",
+    "altro orario",
+    "quell'orario",
+    "quel orario",
+    "rimandare",
+    "rimandiamo",
+    "riprogrammare",
+    "riprogrammiamo",
+  ]);
   const hasAvailability = includesFuzzyAny(normalized, ["posto", "disponibilita", "disponibile", "avete un posto", "avete posto", "c'e posto", "ce posto", "settimana prossima", "prenotare", "quando avete", "slot libero", "orari liberi"]);
   const hasQuote =
     includesFuzzyAny(normalized, ["preventivo", "prezzo", "dottore", "impianto", "implantologia", "chiarimento", "proposta"]) ||
