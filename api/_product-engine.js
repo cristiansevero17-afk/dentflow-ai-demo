@@ -311,12 +311,13 @@ function slotMatchesPreference(time, preference = "") {
 function findOpenSlots(appointments, startDate, preference = "") {
   const options = [];
   const workingTimes = ["09:00", "10:30", "12:00", "15:00", "16:30", "18:00"];
+  const busyStatuses = ["confermato", "completato", "rischio"];
   for (let offset = 0; offset < 21 && options.length < 5; offset += 1) {
     const date = addDays(startDate, offset);
     const weekday = fromISODate(date).getDay();
     if (weekday === 0 || weekday === 6) continue;
     for (const time of workingTimes) {
-      const taken = appointments.some((appointment) => appointment.date === date && appointment.time === time && appointment.status !== "annullato");
+      const taken = appointments.some((appointment) => appointment.date === date && appointment.time === time && busyStatuses.includes(appointment.status));
       const matchesPreference = slotMatchesPreference(time, preference);
       if (!taken && matchesPreference) options.push({ date, time });
       if (options.length >= 5) break;
@@ -455,6 +456,7 @@ function findSpecificOpenSlot(appointments, startDate, requestedTime) {
   if (!requestedTime) return null;
   const hour = Number(String(requestedTime).slice(0, 2));
   if (Number.isNaN(hour) || hour < 9 || hour >= 19) return null;
+  const busyStatuses = ["confermato", "completato", "rischio"];
 
   for (let offset = 0; offset < 21; offset += 1) {
     const date = addDays(startDate, offset);
@@ -463,8 +465,7 @@ function findSpecificOpenSlot(appointments, startDate, requestedTime) {
     const taken = appointments.some((appointment) =>
       appointment.date === date &&
       appointment.time === requestedTime &&
-      appointment.status !== "annullato" &&
-      appointment.status !== "libero"
+      busyStatuses.includes(appointment.status)
     );
     if (!taken) return { date, time: requestedTime };
   }
