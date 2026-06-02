@@ -64,11 +64,14 @@ function addDays(isoDate, amount) {
 
 function formatDate(value) {
   const date = fromISODate(value);
-  return date.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const weekdays = ["domenica", "lunedi'", "martedi'", "mercoledi'", "giovedi'", "venerdi'", "sabato"];
+  const months = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+  return `${weekdays[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 function dayName(value) {
-  return fromISODate(value).toLocaleDateString("it-IT", { weekday: "long" });
+  const weekdays = ["domenica", "lunedi'", "martedi'", "mercoledi'", "giovedi'", "venerdi'", "sabato"];
+  return weekdays[fromISODate(value).getDay()];
 }
 
 function isSameDate(a, b) {
@@ -258,16 +261,28 @@ function makeId(prefix) {
 
 function navMark(item) {
   const map = {
-    agenda: "AG",
-    fillgap: "FG",
-    followup: "FU",
-    patients: "PZ",
-    waitlist: "LA",
-    quotes: "PV",
-    automations: "AU",
-    whatsapp: "WA",
+    agenda: "📅",
+    fillgap: "⚡",
+    followup: "🔁",
+    patients: "👤",
+    waitlist: "⌛",
+    quotes: "📋",
+    automations: "⚙️",
+    whatsapp: "💬",
   };
-  return map[item.id] || item.label.slice(0, 2).toUpperCase();
+  return map[item.id] || item.icon;
+}
+
+function cleanDisplayText(value) {
+  return String(value || "")
+    .replace(/\uFFFD/g, "'")
+    .replace(/Â·/g, "-")
+    .replace(/Ã¨/g, "e'")
+    .replace(/Ã©/g, "e'")
+    .replace(/Ã¬/g, "i'")
+    .replace(/Ã²/g, "o'")
+    .replace(/Ã¹/g, "u'")
+    .replace(/Ã /g, "a'");
 }
 
 function useStoredState(key, initialValue) {
@@ -765,10 +780,10 @@ function Textarea({ className = "", ...props }) {
 function ResultTimeline({ result }) {
   if (!result) return null;
   const steps = [
-    ["Messaggio ricevuto", result.intentLabel || "Richiesta riconosciuta"],
-    ["Contesto CRM", result.confidence ? `Confidenza ${result.confidence}` : "Paziente identificato"],
-    ["Azione operativa", result.action || "Azione registrata"],
-    ["Risposta inviata", result.reply || "Risposta preparata"],
+    ["Messaggio ricevuto", cleanDisplayText(result.intentLabel || "Richiesta riconosciuta")],
+    ["Contesto CRM", cleanDisplayText(result.confidence ? `Confidenza ${result.confidence}` : "Paziente identificato")],
+    ["Azione operativa", cleanDisplayText(result.action || "Azione registrata")],
+    ["Risposta inviata", cleanDisplayText(result.reply || "Risposta preparata")],
   ];
   return (
     <div className="mt-5 grid gap-3 md:grid-cols-4">
@@ -865,7 +880,7 @@ function HomeScreen({ setActiveSection, patients, appointments, gaps, rules, log
                 onClick={() => setActiveSection(item.id)}
                 className="group rounded-3xl border border-slate-200/80 bg-white/95 p-5 text-left shadow-[0_18px_45px_rgba(15,23,42,0.05)] transition hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg"
               >
-                <div className="mb-5 grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-xs font-bold tracking-wide text-teal-700 shadow-sm">{navMark(item)}</div>
+                <div className="mb-5 grid h-12 w-12 place-items-center rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50 text-2xl shadow-sm">{navMark(item)}</div>
                 <h3 className="text-lg font-bold text-slate-950">{item.label}</h3>
                 <p className="mt-3 min-h-[3.5rem] text-sm leading-6 text-slate-600">{item.preview}</p>
                 <span className="mt-4 inline-flex text-sm font-bold text-teal-700">Apri sezione</span>
@@ -893,8 +908,8 @@ function HomeScreen({ setActiveSection, patients, appointments, gaps, rules, log
               <div className="mt-4 grid gap-3">
                 {log.slice(0, 3).length ? log.slice(0, 3).map((entry) => (
                   <div key={entry.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm">
-                    <div className="font-bold">{entry.patient} - {entry.action}</div>
-                    <div className="mt-1 text-slate-500">{entry.reply}</div>
+                    <div className="font-bold">{cleanDisplayText(entry.patient)} - {cleanDisplayText(entry.action)}</div>
+                    <div className="mt-1 text-slate-500">{cleanDisplayText(entry.reply)}</div>
                   </div>
                 )) : (
                   <div className="rounded-2xl border border-dashed border-slate-200 p-5 text-sm text-slate-500">Il registro si popola appena arrivano messaggi o automazioni.</div>
@@ -917,7 +932,7 @@ function Sidebar({ activeSection, setActiveSection, setHome }) {
             <div className="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-teal-700 to-cyan-600 font-bold text-white shadow-md shadow-teal-900/15">S</div>
             <div>
               <div className="text-base font-bold text-slate-950">StudioFlow Dental</div>
-              <div className="text-sm text-slate-500">Studio dentistico · Milano</div>
+              <div className="text-sm text-slate-500">Studio dentistico - Milano</div>
             </div>
           </div>
         </div>
@@ -932,7 +947,7 @@ function Sidebar({ activeSection, setActiveSection, setHome }) {
                   active ? "bg-teal-50 text-teal-800 ring-1 ring-teal-100" : "text-slate-600 hover:bg-slate-50 hover:text-slate-950"
                 }`}
               >
-                <span className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-[11px] font-bold tracking-wide text-teal-700 shadow-sm">{navMark(item)}</span>
+                <span className="grid h-9 w-9 place-items-center rounded-xl border border-slate-200 bg-white text-lg shadow-sm">{navMark(item)}</span>
                 <span>{item.label}</span>
               </button>
             );
@@ -1077,14 +1092,14 @@ function AgendaSection({ patients, appointments, setAppointments, selectedDate, 
         <div className="space-y-6">
           <Panel className="p-5">
             <h2 className="text-xl font-bold">Appuntamenti del giorno</h2>
-            <p className="mt-1 text-sm text-slate-500">{dayName(selectedDate)} · {formatDate(selectedDate)}</p>
+            <p className="mt-1 text-sm text-slate-500">{dayName(selectedDate)} - {formatDate(selectedDate)}</p>
             <div className="mt-5 space-y-3">
               {selectedAppointments.length ? (
                 selectedAppointments.map((appointment) => (
                   <div key={appointment.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <div className="text-sm font-bold text-slate-500">{appointment.time} · {appointment.duration} min</div>
+                        <div className="text-sm font-bold text-slate-500">{appointment.time} - {appointment.duration} min</div>
                         <div className="mt-1 text-lg font-bold">{appointment.patientName}</div>
                         <div className="text-sm text-slate-600">{appointment.treatment}</div>
                         <div className="mt-1 text-xs text-slate-500">{appointment.operator || "Operatore da assegnare"} - {appointment.room || "Poltrona da assegnare"}</div>
@@ -1197,8 +1212,8 @@ function FillGapSection({ gaps, patients, appointments, waitlist, onRunGap, onCl
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <Pill tone={gap.status === "riempito" ? "green" : "amber"}>{gap.status}</Pill>
-                    <h2 className="mt-3 text-2xl font-bold">Slot libero · {formatDate(slot.date)} alle {slot.time}</h2>
-                    <p className="mt-1 text-slate-600">{slot.treatment} · paziente originario: {slot.patientName}</p>
+                    <h2 className="mt-3 text-2xl font-bold">Slot libero - {formatDate(slot.date)} alle {slot.time}</h2>
+                    <p className="mt-1 text-slate-600">{slot.treatment} - paziente originario: {slot.patientName}</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button onClick={() => onRunGap(gap.id)}>Avvia gestione automatica</Button>
@@ -1252,7 +1267,7 @@ function FillGapSection({ gaps, patients, appointments, waitlist, onRunGap, onCl
                           <td className="px-4 py-4">
                             <Pill tone={candidate.score >= 80 ? "green" : candidate.score >= 65 ? "teal" : "slate"}>{candidate.score}/100</Pill>
                           </td>
-                          <td className="px-4 py-4 text-slate-600">{candidate.reasons.join(" · ")}</td>
+                          <td className="px-4 py-4 text-slate-600">{candidate.reasons.join(" - ")}</td>
                           <td className="px-4 py-4">{candidate.status}</td>
                         </tr>
                       ))}
@@ -1336,7 +1351,7 @@ function FollowUpSection({ patients, rules, setRules }) {
               <div key={patient.id} className="flex items-center justify-between rounded-2xl border border-slate-200 p-4">
                 <div>
                   <div className="font-bold">{patient.name}</div>
-                  <div className="text-sm text-slate-500">{patient.dueReason} · ultimo appuntamento {daysSince(patient.lastVisit)} giorni fa</div>
+                  <div className="text-sm text-slate-500">{patient.dueReason} - ultimo appuntamento {daysSince(patient.lastVisit)} giorni fa</div>
                 </div>
                 <Pill tone="teal">Invio automatico</Pill>
               </div>
@@ -1883,7 +1898,7 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
               <h3 className="mt-4 text-lg font-bold">{result.action}</h3>
               <ResultTimeline result={result} />
               <p className="mt-3 text-sm font-semibold text-slate-700">Risposta WhatsApp automatica</p>
-              <p className="mt-2 rounded-2xl border border-teal-200 bg-white p-4 text-sm leading-6 text-slate-700">{result.reply}</p>
+              <p className="mt-2 rounded-2xl border border-teal-200 bg-white p-4 text-sm leading-6 text-slate-700">{cleanDisplayText(result.reply)}</p>
               {Array.isArray(result.operations) && result.operations.length ? (
                 <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
                   <div className="text-sm font-bold">Azioni pianificate</div>
@@ -1905,8 +1920,8 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
             <div className="mt-3 space-y-2">
               {outboundQueue.slice(0, 4).map((item, index) => (
                 <div key={`${item.to}-${index}`} className="rounded-xl bg-white p-3 text-sm text-slate-700">
-                  <div className="font-semibold">{item.reason || "Messaggio automatico"} · {item.dryRun ? "dry-run" : "inviato"}</div>
-                  <div className="mt-1 text-slate-500">{item.text}</div>
+                  <div className="font-semibold">{cleanDisplayText(item.reason || "Messaggio automatico")} - {item.dryRun ? "dry-run" : "inviato"}</div>
+                  <div className="mt-1 text-slate-500">{cleanDisplayText(item.text)}</div>
                 </div>
               ))}
             </div>
@@ -1917,12 +1932,12 @@ function WhatsAppSection({ patients, appointments, setAppointments, onCreateGap,
             log.map((entry) => (
               <div key={entry.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="font-bold">{entry.createdAt} · {entry.patient}</div>
-                  <Pill tone="slate">{entry.engine}</Pill>
+                  <div className="font-bold">{cleanDisplayText(entry.createdAt)} - {cleanDisplayText(entry.patient)}</div>
+                  <Pill tone="slate">{cleanDisplayText(entry.engine)}</Pill>
                 </div>
-                <p className="mt-2 text-sm text-slate-600">{entry.message}</p>
-                <p className="mt-2 text-sm font-semibold text-teal-700">{entry.action}</p>
-                <p className="mt-2 text-sm text-slate-600">{entry.reply}</p>
+                <p className="mt-2 text-sm text-slate-600">{cleanDisplayText(entry.message)}</p>
+                <p className="mt-2 text-sm font-semibold text-teal-700">{cleanDisplayText(entry.action)}</p>
+                <p className="mt-2 text-sm text-slate-600">{cleanDisplayText(entry.reply)}</p>
               </div>
             ))
           ) : (
@@ -2125,7 +2140,7 @@ function ProductApp() {
         const candidate = gap.candidates.find((item) => item.status !== "Non contattare") || gap.candidates[0];
         return {
           ...gap,
-          status: candidate ? `WhatsApp inviati · in attesa di ${candidate.name}` : "Nessun candidato contattabile",
+          status: candidate ? `WhatsApp inviati - in attesa di ${candidate.name}` : "Nessun candidato contattabile",
           candidates: gap.candidates.map((item, index) => {
             if (index < 10 && item.status !== "Non contattare") return { ...item, status: index === 0 ? "Primo contatto inviato" : "Invio in coda top 10" };
             return item;

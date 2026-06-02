@@ -105,7 +105,10 @@ function addDays(isoDate, amount) {
 }
 
 function formatDate(value) {
-  return fromISODate(value).toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+  const date = fromISODate(value);
+  const weekdays = ["domenica", "lunedi'", "martedi'", "mercoledi'", "giovedi'", "venerdi'", "sabato"];
+  const months = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre"];
+  return `${weekdays[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
 }
 
 function isCancellationIntentText(value) {
