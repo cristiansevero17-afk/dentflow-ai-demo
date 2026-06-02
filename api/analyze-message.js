@@ -155,7 +155,9 @@ function analyzeLocally(message, patientName) {
   const hasCancellation = includesFuzzyAny(normalized, ["non posso", "non riesco", "non ce la faccio", "rinuncia", "rinunciare", "annullare", "annullo", "disdire", "disdetta", "cancellare", "non vengo", "impossibile venire", "devo saltare"]);
   const hasReschedule = includesFuzzyAny(normalized, ["anticipare", "anticipo", "spostare", "spostamento", "posticipare", "posticipo", "cambiare", "cambio", "altro orario", "quell'orario", "quel orario", "rimandare", "riprogrammare"]);
   const hasAvailability = includesFuzzyAny(normalized, ["posto", "disponibilita", "disponibile", "avete un posto", "avete posto", "c'e posto", "ce posto", "settimana prossima", "prenotare", "quando avete", "slot libero", "orari liberi"]);
-  const hasQuote = includesFuzzyAny(normalized, ["preventivo", "prezzo", "costo", "dottore", "impianto", "implantologia", "chiarimento", "proposta"]);
+  const hasQuote =
+    includesFuzzyAny(normalized, ["preventivo", "prezzo", "dottore", "impianto", "implantologia", "chiarimento", "proposta"]) ||
+    /\b(cost[ao]|quanto costa|quanto viene|spesa)\b/.test(normalized);
   const hasConfirmation = hasConfirmationIntent(normalized);
   const firstName = String(patientName || "Paziente").split(" ")[0] || "Paziente";
   const detected = [
@@ -210,21 +212,6 @@ function analyzeLocally(message, patientName) {
     };
   }
 
-  if (hasAvailability) {
-    return {
-      intent: "richiesta_disponibilita",
-      intentLabel: "Richiesta disponibilita'",
-      confidence: "Buona",
-      confidenceScore: 0.74,
-      detected,
-      actionTitle: "Cerca slot compatibili in agenda",
-      actionDetail: "Il sistema filtra agenda, fascia preferita e storico WhatsApp del paziente, poi propone due opzioni libere.",
-      reply: `Ciao ${firstName}, abbiamo trovato due opzioni compatibili: martedi alle 15:30 oppure giovedi alle 17:00. Quale preferisci?`,
-      status: "Disponibilita' proposte",
-      operations: operationsForIntent("richiesta_disponibilita"),
-    };
-  }
-
   if (hasQuote) {
     return {
       intent: "preventivo",
@@ -237,6 +224,21 @@ function analyzeLocally(message, patientName) {
       reply: `Ciao ${firstName}, certo. Possiamo fissare una breve chiamata con lo studio per chiarire ogni dubbio sul preventivo.`,
       status: "Chiarimento preventivo",
       operations: operationsForIntent("preventivo"),
+    };
+  }
+
+  if (hasAvailability) {
+    return {
+      intent: "richiesta_disponibilita",
+      intentLabel: "Richiesta disponibilita'",
+      confidence: "Buona",
+      confidenceScore: 0.74,
+      detected,
+      actionTitle: "Cerca slot compatibili in agenda",
+      actionDetail: "Il sistema filtra agenda, fascia preferita e storico WhatsApp del paziente, poi propone due opzioni libere.",
+      reply: `Ciao ${firstName}, abbiamo trovato due opzioni compatibili: martedi alle 15:30 oppure giovedi alle 17:00. Quale preferisci?`,
+      status: "Disponibilita' proposte",
+      operations: operationsForIntent("richiesta_disponibilita"),
     };
   }
 

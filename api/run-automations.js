@@ -48,8 +48,13 @@ function ruleThreshold(rule) {
   return 160;
 }
 
+function isQuoteRule(rule) {
+  return normalizeText(`${rule.name} ${rule.trigger} ${rule.delay}`).includes("preventivo");
+}
+
 function ruleMatchesPatient(rule, patient) {
   const text = normalizeText(`${rule.name} ${rule.trigger}`);
+  if (isQuoteRule(rule)) return false;
   if (text.includes("igiene")) return valueIncludes(patient.treatments, "Igiene dentale");
   if (text.includes("controllo")) return valueIncludes(patient.treatments, "Controllo") || true;
   return true;
@@ -95,6 +100,7 @@ async function processFollowUps({ state, force, mode }) {
   const processed = [];
 
   for (const rule of rules) {
+    if (isQuoteRule(rule)) continue;
     const threshold = ruleThreshold(rule);
     for (const patient of patients) {
       if (!patient.consent || !patient.phone || !patient.lastVisit) continue;

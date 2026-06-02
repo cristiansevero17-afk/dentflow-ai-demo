@@ -684,6 +684,25 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
     };
     action = "Agenda consultata e disponibilita' proposte";
     reply = `Ciao ${firstName}, abbiamo controllato l'agenda. Le prime disponibilita' compatibili sono ${optionText}. Puoi rispondere con \"la prima\", \"la seconda\" o con l'orario che preferisci.`;
+  } else if (analysis.intent === "preventivo") {
+    const patientQuotes = Array.isArray(state.quotes)
+      ? state.quotes.filter((quote) => quote.patientId === patient.id)
+      : [];
+    const quote = patientQuotes[0];
+    action = "Preventivo collegato e chiarimento proposto";
+    reply =
+      analysis.reply ||
+      `Ciao ${firstName}, certo. Possiamo fissare una breve chiamata con lo studio per chiarire ogni dubbio${quote?.treatment ? ` sul preventivo per ${quote.treatment}` : " sul preventivo"}. Ti va bene se ti proponiamo due disponibilita'?`;
+    nextState = {
+      ...nextState,
+      quotes: Array.isArray(state.quotes)
+        ? state.quotes.map((item) =>
+            item.patientId === patient.id
+              ? { ...item, status: "Chiarimento richiesto", nextAction: "Risposta WhatsApp gestita" }
+              : item
+          )
+        : state.quotes,
+    };
   }
 
   const logEntry = {
