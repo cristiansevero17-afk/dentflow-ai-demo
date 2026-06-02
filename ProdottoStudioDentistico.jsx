@@ -321,6 +321,7 @@ const INITIAL_PATIENTS = [
     responseRate: 94,
     waitingList: true,
     lastVisit: addDays(today, -180),
+    birthDate: today,
     notes: "Preferisce WhatsApp e appuntamenti dopo il lavoro.",
   },
   {
@@ -334,6 +335,7 @@ const INITIAL_PATIENTS = [
     responseRate: 82,
     waitingList: false,
     lastVisit: addDays(today, -215),
+    birthDate: `${currentYear}-09-12`,
     notes: "Storico risposte rapido entro un'ora.",
   },
   {
@@ -347,6 +349,7 @@ const INITIAL_PATIENTS = [
     responseRate: 76,
     waitingList: false,
     lastVisit: addDays(today, -205),
+    birthDate: `${currentYear}-03-04`,
     notes: "Chiede spesso disponibilita' il venerdi mattina.",
   },
   {
@@ -360,6 +363,7 @@ const INITIAL_PATIENTS = [
     responseRate: 73,
     waitingList: false,
     lastVisit: addDays(today, -90),
+    birthDate: `${currentYear}-11-18`,
     notes: "Cliente abituale, molto puntuale nelle conferme.",
   },
   {
@@ -373,6 +377,7 @@ const INITIAL_PATIENTS = [
     responseRate: 88,
     waitingList: true,
     lastVisit: addDays(today, -230),
+    birthDate: `${currentYear}-07-22`,
     notes: "Disponibile con poco preavviso se lo slot e' nel pomeriggio.",
   },
   {
@@ -386,6 +391,7 @@ const INITIAL_PATIENTS = [
     responseRate: 69,
     waitingList: false,
     lastVisit: addDays(today, -45),
+    birthDate: `${currentYear}-02-09`,
     notes: "Preventivo implantologia aperto.",
   },
   {
@@ -399,6 +405,7 @@ const INITIAL_PATIENTS = [
     responseRate: 63,
     waitingList: false,
     lastVisit: addDays(today, -120),
+    birthDate: `${currentYear}-10-03`,
     notes: "Preferisce appuntamenti prima delle 11:00.",
   },
   {
@@ -412,6 +419,7 @@ const INITIAL_PATIENTS = [
     responseRate: 71,
     waitingList: false,
     lastVisit: addDays(today, -330),
+    birthDate: `${currentYear}-05-14`,
     notes: "Consenso WhatsApp non attivo.",
   },
 ];
@@ -533,18 +541,33 @@ const INITIAL_RULES = [
     name: "Paziente inattivo",
     trigger: "Nessun appuntamento da 12 mesi",
     delay: "12 mesi",
-    active: false,
+    active: true,
     template: "Ciao {nome}, se vuoi possiamo aiutarti a programmare un controllo.",
   },
 ];
 
 const INITIAL_AUTOMATIONS = [
   { id: "auto-inbound", label: "Lettura messaggi WhatsApp", active: true, detail: "Classifica richieste, rinunce, spostamenti e conferme." },
+  { id: "auto-reminders", label: "Reminder appuntamenti", active: true, detail: "Invia conferme 48h e 24h prima della visita." },
   { id: "auto-gap", label: "Fill the Gap top 10", active: true, detail: "Contatta prima i pazienti piu' compatibili con lo slot libero." },
+  { id: "auto-risk-slots", label: "Slot a rischio", active: true, detail: "Prepara una coda compatibile se un appuntamento e' fragile." },
   { id: "auto-timeout", label: "Timeout 1h 30m", active: true, detail: "Se nessuno risponde, apre una nuova ondata di candidati." },
   { id: "auto-followup", label: "Follow-up automatici", active: true, detail: "Invia richiami WhatsApp in base alle regole impostate." },
+  { id: "auto-inactive", label: "Pazienti inattivi", active: true, detail: "Richiama chi non torna da molti mesi." },
+  { id: "auto-post-visit", label: "Post visita", active: true, detail: "Controlla i pazienti dopo trattamenti delicati." },
   { id: "auto-quotes", label: "Preventivi", active: true, detail: "Segue i preventivi aperti con messaggi progressivi." },
+  { id: "auto-reviews", label: "Recensioni Google", active: true, detail: "Chiede recensioni dopo visite completate." },
+  { id: "auto-birthday", label: "Compleanni", active: true, detail: "Invia messaggi di fidelizzazione nel giorno giusto." },
+  { id: "auto-daily-summary", label: "Riepilogo giornaliero", active: true, detail: "Prepara un breve quadro operativo per lo studio." },
 ];
+
+function mergeById(defaultItems, savedItems) {
+  const saved = Array.isArray(savedItems) ? savedItems : [];
+  const savedById = new Map(saved.map((item) => [item.id, item]));
+  const merged = defaultItems.map((item) => ({ ...item, ...(savedById.get(item.id) || {}) }));
+  const defaultIds = new Set(defaultItems.map((item) => item.id));
+  return [...merged, ...saved.filter((item) => item?.id && !defaultIds.has(item.id))];
+}
 
 function valueIncludes(value, needle) {
   const target = normalizeText(needle);
@@ -606,6 +629,7 @@ function parsePatientsCsv(text) {
       responseRate: Number(get(cells, ["risposta", "response"])) || 70,
       waitingList: normalizeText(get(cells, ["attesa", "lista"])).includes("si"),
       lastVisit: get(cells, ["ultima", "last"]) || addDays(todayISO(), -180),
+      birthDate: get(cells, ["compleanno", "nascita", "birth"]) || "",
       notes: get(cells, ["note"]) || "Importato da CSV.",
     };
   }).filter(Boolean);
@@ -1405,7 +1429,7 @@ function FollowUpSection({ patients, rules, setRules, automationRuns, onRunAutom
 }
 
 function PatientsSection({ patients, setPatients }) {
-  const [importText, setImportText] = useState("nome,telefono,fascia,trattamento,consenso,note\nLaura Verdi,+39 333 000 1111,Pomeriggio,Igiene dentale,si,Preferisce WhatsApp");
+  const [importText, setImportText] = useState("nome,telefono,fascia,trattamento,consenso,compleanno,note\nLaura Verdi,+39 333 000 1111,Pomeriggio,Igiene dentale,si,1990-09-12,Preferisce WhatsApp");
   const [importMessage, setImportMessage] = useState("");
   const [form, setForm] = useState({
     name: "",
@@ -1413,6 +1437,7 @@ function PatientsSection({ patients, setPatients }) {
     preferredTimes: ["Pomeriggio"],
     treatments: ["Igiene dentale"],
     consent: true,
+    birthDate: "",
     notes: "",
   });
 
@@ -1430,7 +1455,7 @@ function PatientsSection({ patients, setPatients }) {
         lastVisit: addDays(todayISO(), -180),
       },
     ]);
-    setForm({ name: "", phone: "", preferredTimes: ["Pomeriggio"], treatments: ["Igiene dentale"], consent: true, notes: "" });
+    setForm({ name: "", phone: "", preferredTimes: ["Pomeriggio"], treatments: ["Igiene dentale"], consent: true, birthDate: "", notes: "" });
   };
 
   const importPatients = () => {
@@ -1466,6 +1491,9 @@ function PatientsSection({ patients, setPatients }) {
             <Field label="Telefono WhatsApp">
               <Input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} placeholder="+39 ..." />
             </Field>
+            <Field label="Compleanno">
+              <Input type="date" value={form.birthDate} onChange={(event) => setForm({ ...form, birthDate: event.target.value })} />
+            </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Fascia preferita">
                 <Select value={form.preferredTimes[0]} onChange={(event) => setForm({ ...form, preferredTimes: [event.target.value] })}>
@@ -1491,7 +1519,7 @@ function PatientsSection({ patients, setPatients }) {
 
         <Panel className="p-6">
           <h2 className="text-xl font-bold">Import CSV</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">Colonne consigliate: nome, telefono, fascia, trattamento, consenso, note.</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">Colonne consigliate: nome, telefono, fascia, trattamento, consenso, compleanno, note.</p>
           <Textarea className="mt-4" rows="5" value={importText} onChange={(event) => setImportText(event.target.value)} />
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <Button type="button" onClick={importPatients}>Importa pazienti</Button>
@@ -1522,6 +1550,7 @@ function PatientsSection({ patients, setPatients }) {
                 <th className="px-5 py-4">Paziente</th>
                 <th className="px-5 py-4">Numero WhatsApp</th>
                 <th className="px-5 py-4">Preferenze</th>
+                <th className="px-5 py-4">Compleanno</th>
                 <th className="px-5 py-4">Consenso</th>
                 <th className="px-5 py-4">Storico</th>
               </tr>
@@ -1535,6 +1564,7 @@ function PatientsSection({ patients, setPatients }) {
                   </td>
                   <td className="px-5 py-4">{patient.phone}</td>
                   <td className="px-5 py-4">{listText(patient.preferredTimes)} - {listText(patient.treatments)}</td>
+                  <td className="px-5 py-4 text-slate-600">{patient.birthDate || "-"}</td>
                   <td className="px-5 py-4"><Pill tone={patient.consent ? "green" : "rose"}>{patient.consent ? "Attivo" : "Assente"}</Pill></td>
                   <td className="px-5 py-4 text-slate-600">{daysSince(patient.lastVisit)} giorni fa</td>
                 </tr>
@@ -2040,8 +2070,8 @@ function ProductApp() {
     if (Array.isArray(state.appointments)) setAppointments(state.appointments);
     if (Array.isArray(state.waitlist)) setWaitlist(state.waitlist);
     if (Array.isArray(state.quotes)) setQuotes(state.quotes);
-    if (Array.isArray(state.rules)) setRules(state.rules);
-    if (Array.isArray(state.automations)) setAutomations(state.automations);
+    if (Array.isArray(state.rules)) setRules(mergeById(INITIAL_RULES, state.rules));
+    if (Array.isArray(state.automations)) setAutomations(mergeById(INITIAL_AUTOMATIONS, state.automations));
     if (Array.isArray(state.gaps)) setGaps(state.gaps);
     if (Array.isArray(state.log)) setLog(state.log);
     if (Array.isArray(state.outboundQueue)) setOutboundQueue(state.outboundQueue);
@@ -2051,6 +2081,11 @@ function ProductApp() {
       applyingRemoteRef.current = false;
     }, 0);
   };
+
+  useEffect(() => {
+    setRules((current) => mergeById(INITIAL_RULES, current));
+    setAutomations((current) => mergeById(INITIAL_AUTOMATIONS, current));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
