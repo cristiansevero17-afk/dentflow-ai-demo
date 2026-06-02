@@ -325,9 +325,25 @@ function findOpenSlots(appointments, startDate, preference = "") {
   return options;
 }
 
+function valueIncludes(value, needle) {
+  const target = normalizeText(needle);
+  if (!target) return false;
+  if (Array.isArray(value)) return value.some((item) => {
+    const normalizedItem = normalizeText(item);
+    return normalizedItem.includes(target) || target.includes(normalizedItem);
+  });
+  return normalizeText(value).includes(target);
+}
+
+function firstPatientTreatment(patient) {
+  const knownTreatments = ["Igiene dentale", "Controllo", "Sbiancamento", "Implantologia", "Ortodonzia", "Devitalizzazione"];
+  if (Array.isArray(patient?.treatments) && patient.treatments[0]) return patient.treatments[0];
+  return knownTreatments.find((treatment) => valueIncludes(patient?.treatments, treatment)) || "Controllo";
+}
+
 function rankCandidate(patient, slot, waitlist) {
-  const treatmentMatch = Array.isArray(patient.treatments) && patient.treatments.includes(slot.treatment) ? 30 : 0;
-  const preferredTime = Array.isArray(patient.preferredTimes) && patient.preferredTimes.includes(timeBucket(slot.time)) ? 24 : 0;
+  const treatmentMatch = valueIncludes(patient.treatments, slot.treatment) ? 30 : 0;
+  const preferredTime = valueIncludes(patient.preferredTimes || patient.preferredTime, timeBucket(slot.time)) ? 24 : 0;
   const waitlistBoost = Array.isArray(waitlist) && waitlist.some((item) => item.patientId === patient.id && item.treatment === slot.treatment) ? 18 : 0;
   const consent = patient.consent ? 14 : -100;
   const response = Math.round(Number(patient.responseRate || 60) * 0.12);
@@ -556,7 +572,7 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
       action = "Appuntamento spostato automaticamente";
       reply = `Perfetto ${firstName}, abbiamo spostato l'appuntamento a ${formatDate(option.date)} alle ${option.time}. A presto.`;
     } else {
-      const treatment = pending.treatment || (Array.isArray(patient.treatments) && patient.treatments[0]) || "Controllo";
+      const treatment = pending.treatment || firstPatientTreatment(patient);
       const appointment = createAppointmentFromOption({ option, patient, treatment });
       nextState = {
         ...nextState,
@@ -637,7 +653,7 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
       nextPending = {
         type: "booking",
         source: "cancellation_without_appointment",
-        treatment: (Array.isArray(patient.treatments) && patient.treatments[0]) || "Controllo",
+        treatment: firstPatientTreatment(patient),
         options: options.slice(0, 5),
         createdAt: new Date().toISOString(),
       };
@@ -648,7 +664,7 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
       type: rescheduleTarget.appointment ? "reschedule" : "booking",
       source: "reschedule_request",
       originalAppointmentId: rescheduleTarget.appointment?.id || null,
-      treatment: rescheduleTarget.appointment?.treatment || (Array.isArray(patient.treatments) && patient.treatments[0]) || "Controllo",
+      treatment: rescheduleTarget.appointment?.treatment || firstPatientTreatment(patient),
       options: options.slice(0, 5),
       createdAt: new Date().toISOString(),
     };
@@ -658,7 +674,7 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
     nextPending = {
       type: "booking",
       source: "availability_request",
-      treatment: (Array.isArray(patient.treatments) && patient.treatments[0]) || "Controllo",
+      treatment: firstPatientTreatment(patient),
       options: options.slice(0, 5),
       createdAt: new Date().toISOString(),
     };
