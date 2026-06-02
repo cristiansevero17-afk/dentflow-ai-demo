@@ -131,7 +131,7 @@ function operationsForIntent(intent) {
     preventivo: ["Collega il messaggio al preventivo aperto", "Propone chiarimento o chiamata", "Aggiorna stato preventivo", "Registra la risposta"],
     conferma: ["Conferma lo slot in agenda", "Aggiorna stato conversazione", "Registra conferma nel CRM"],
     da_chiarire: ["Non modifica l'agenda", "Chiede il dettaglio mancante", "Mantiene la richiesta in coda"],
-    generico: ["Traccia il messaggio", "Crea attivita' operativa", "Prepara risposta controllata"],
+    generico: ["Traccia il messaggio", "Nessuna modifica agenda", "Aggiorna la conversazione"],
   };
   return map[intent] || map.generico;
 }
@@ -186,6 +186,9 @@ function analyzeLocally(message, patientName) {
     signals.time ? `Orario: ${signals.time}` : "Orario: da verificare in agenda",
     signals.preference ? `Preferenza: ${signals.preference}` : "Preferenza: non specificata",
   ];
+
+  const nonOperational = classifyNonOperationalMessage(message, patientName);
+  if (nonOperational) return nonOperational;
 
   if (hasReschedule && !hasCancellation && !hasAppointmentReference && !signals.date && !signals.time) {
     return {
@@ -279,15 +282,110 @@ function analyzeLocally(message, patientName) {
 
   return {
     intent: "generico",
-    intentLabel: "Richiesta generica",
+    intentLabel: "Messaggio generico",
     confidence: "Media",
     confidenceScore: 0.48,
     detected,
-    actionTitle: "Crea attivita' operativa",
-    actionDetail: "Il messaggio viene tracciato e messo in coda per una risposta automatica controllata.",
-    reply: `Ciao ${firstName}, grazie per il messaggio. Lo studio ha preso in carico la richiesta e ti risponde a breve.`,
-    status: "Richiesta presa in carico",
+    actionTitle: "Registra il messaggio senza modificare l'agenda",
+    actionDetail: "Il messaggio non contiene una richiesta operativa chiara: il sistema aggiorna solo la conversazione.",
+    reply: `Ciao ${firstName}, grazie per il messaggio. Scrivici pure se hai bisogno di prenotare, spostare un appuntamento o chiedere disponibilita'.`,
+    status: "Messaggio registrato",
     operations: operationsForIntent("generico"),
+  };
+}
+
+function hasOperationalSignal(message) {
+  const normalized = normalizeMessageText(message);
+  return includesFuzzyAny(normalized, [
+    "appuntamento",
+    "visita",
+    "igiene",
+    "controllo",
+    "seduta",
+    "prenotazione",
+    "non posso",
+    "non riesco",
+    "annullare",
+    "disdire",
+    "spostare",
+    "cambiare",
+    "posticipare",
+    "anticipare",
+    "disponibilita",
+    "posto",
+    "prenotare",
+    "preventivo",
+    "prezzo",
+    "costo",
+  ]);
+}
+
+function classifyNonOperationalMessage(message, patientName = "Paziente") {
+  const normalized = normalizeMessageText(message);
+  if (!normalized || hasOperationalSignal(normalized)) return null;
+
+  const firstName = String(patientName || "Paziente").split(" ")[0] || "Paziente";
+  const messageWords = words(normalized);
+  const detected = [
+    `Paziente: ${patientName || "Paziente"}`,
+    "Richiesta operativa: assente",
+    "Agenda: nessuna modifica",
+    "Risposta: conversazionale",
+  ];
+  const base = {
+    intent: "generico",
+    confidence: "Alta",
+    confidenceScore: 0.92,
+    detected,
+    actionTitle: "Registra il messaggio senza modificare l'agenda",
+    actionDetail: "Il testo non contiene richieste su appuntamenti, disponibilita', preventivi o trattamenti.",
+    status: "Messaggio non operativo",
+    operations: operationsForIntent("generico"),
+    tone: "slate",
+  };
+
+  const looksLikeAcceptance = /\b(si|ok)\b/.test(normalized) || includesFuzzyAny(normalized, ["confermo", "va bene", "ci sono", "lo prendo", "la prima", "la seconda"]);
+  if (looksLikeAcceptance && !normalized.includes("grazie")) return null;
+
+  const greetingWords = ["ciao", "buongiorno", "buonasera", "salve", "hey", "hello"];
+  const gratitudeWords = ["grazie", "ringrazio"];
+  const documentWords = ["documenti", "documento", "foto", "radiografia", "referto", "allego", "allegato", "mando", "invio"];
+  const isGreeting = messageWords.length <= 3 && messageWords.some((word) => greetingWords.some((item) => fuzzyWordMatch(word, item)));
+  const isGratitude = messageWords.length <= 5 && messageWords.some((word) => gratitudeWords.some((item) => fuzzyWordMatch(word, item)));
+  const isDocumentInfo = messageWords.some((word) => documentWords.some((item) => fuzzyWordMatch(word, item)));
+
+  if (isGreeting) {
+    return {
+      ...base,
+      intentLabel: "Saluto",
+      reply: `Ciao ${firstName}, dimmi pure come possiamo aiutarti.`,
+      status: "Saluto ricevuto",
+    };
+  }
+
+  if (isGratitude) {
+    return {
+      ...base,
+      intentLabel: "Ringraziamento",
+      reply: `Grazie a te ${firstName}, a presto.`,
+      status: "Ringraziamento ricevuto",
+    };
+  }
+
+  if (isDocumentInfo) {
+    return {
+      ...base,
+      intentLabel: "Messaggio informativo",
+      reply: `Grazie ${firstName}, abbiamo ricevuto il messaggio. Se devi inviare documenti o immagini puoi allegarli qui.`,
+      status: "Aggiornamento ricevuto",
+    };
+  }
+
+  return {
+    ...base,
+    intentLabel: "Messaggio senza richiesta",
+    reply: `Ciao ${firstName}, grazie per il messaggio. Scrivici pure se hai bisogno di prenotare, spostare un appuntamento o chiedere disponibilita'.`,
+    status: "Messaggio non operativo",
   };
 }
 
@@ -576,7 +674,8 @@ async function analyzeIncomingMessage({ message = "", patientName = "Paziente", 
     (
       (fallback.confidenceScore >= 0.86 && ["rinuncia", "spostamento", "conferma"].includes(fallback.intent)) ||
       (fallback.confidenceScore >= 0.84 && fallback.intent === "preventivo") ||
-      (fallback.confidenceScore >= 0.74 && fallback.intent === "richiesta_disponibilita")
+      (fallback.confidenceScore >= 0.74 && fallback.intent === "richiesta_disponibilita") ||
+      (fallback.confidenceScore >= 0.9 && fallback.intent === "generico" && includesFuzzyAny(normalizeMessageText(fallback.status), ["messaggio non operativo", "saluto ricevuto", "ringraziamento ricevuto", "aggiornamento ricevuto"]))
     ) &&
     process.env.AI_VALIDATE_HIGH_CONFIDENCE !== "true";
 

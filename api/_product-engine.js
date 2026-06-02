@@ -129,6 +129,71 @@ function isDefiniteConfirmationText(value) {
   );
 }
 
+function hasOperationalSignal(value) {
+  const text = normalizeText(value);
+  return includesFuzzyAny(text, [
+    "appuntamento",
+    "visita",
+    "igiene",
+    "controllo",
+    "seduta",
+    "prenotazione",
+    "non posso",
+    "non riesco",
+    "annullare",
+    "disdire",
+    "spostare",
+    "cambiare",
+    "posticipare",
+    "anticipare",
+    "disponibilita",
+    "posto",
+    "prenotare",
+    "preventivo",
+    "prezzo",
+    "costo",
+  ]);
+}
+
+function nonOperationalResponse(messageText, firstName) {
+  const text = normalizeText(messageText);
+  if (!text || hasOperationalSignal(text)) return null;
+
+  const tokens = words(text);
+  const looksLikeAcceptance = /\b(si|ok)\b/.test(text) || includesFuzzyAny(text, ["confermo", "va bene", "ci sono", "lo prendo", "la prima", "la seconda"]);
+  if (looksLikeAcceptance && !text.includes("grazie")) return null;
+
+  const hasGreeting = tokens.length <= 3 && tokens.some((word) => ["ciao", "buongiorno", "buonasera", "salve", "hey", "hello"].some((item) => fuzzyWordMatch(word, item)));
+  const hasThanks = tokens.length <= 5 && tokens.some((word) => ["grazie", "ringrazio"].some((item) => fuzzyWordMatch(word, item)));
+  const hasDocumentInfo = tokens.some((word) => ["documenti", "documento", "foto", "radiografia", "referto", "allego", "allegato", "mando", "invio"].some((item) => fuzzyWordMatch(word, item)));
+
+  if (hasGreeting) {
+    return {
+      action: "Saluto ricevuto",
+      reply: `Ciao ${firstName}, dimmi pure come possiamo aiutarti.`,
+    };
+  }
+
+  if (hasThanks) {
+    return {
+      action: "Ringraziamento ricevuto",
+      reply: `Grazie a te ${firstName}, a presto.`,
+    };
+  }
+
+  if (hasDocumentInfo) {
+    return {
+      action: "Aggiornamento ricevuto",
+      reply: `Grazie ${firstName}, abbiamo ricevuto il messaggio. Se devi inviare documenti o immagini puoi allegarli qui.`,
+    };
+  }
+
+  return {
+    action: "Messaggio non operativo registrato",
+    reply: `Ciao ${firstName}, grazie per il messaggio. Scrivici pure se hai bisogno di prenotare, spostare un appuntamento o chiedere disponibilita'.`,
+  };
+}
+
 function timeBucket(time) {
   const hour = Number(String(time || "00:00").slice(0, 2));
   if (hour < 12) return "Mattina";
@@ -512,7 +577,8 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
     ? options.slice(0, 2).map((item) => `${formatDate(item.date)} alle ${item.time}`).join(" oppure ")
     : "al momento non risultano slot liberi compatibili nei prossimi giorni";
   const isCancellation = analysis.intent === "rinuncia" || isCancellationIntentText(messageText);
-  const isConfirmation = analysis.intent === "conferma" || isDefiniteConfirmationText(messageText);
+  const nonOperational = nonOperationalResponse(messageText, firstName);
+  const isConfirmation = !nonOperational && (analysis.intent === "conferma" || isDefiniteConfirmationText(messageText));
   let nextState = { ...state };
   let action = "Richiesta registrata";
   let reply = analysis.reply || `Ciao ${firstName}, abbiamo preso in carico la richiesta.`;
@@ -703,6 +769,10 @@ function updateStateForIncomingMessage({ state, patient, messageText, analysis }
           )
         : state.quotes,
     };
+  } else if (nonOperational) {
+    action = nonOperational.action;
+    reply = nonOperational.reply;
+    nextPending = pending || null;
   }
 
   const logEntry = {
