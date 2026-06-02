@@ -1287,7 +1287,7 @@ function FillGapSection({ gaps, patients, appointments, waitlist, onRunGap, onCl
   );
 }
 
-function FollowUpSection({ patients, rules, setRules }) {
+function FollowUpSection({ patients, rules, setRules, automationRuns, onRunAutomations, automationResult }) {
   const [newRule, setNewRule] = useState({
     name: "Richiamo personalizzato",
     trigger: "Trattamento completato",
@@ -1309,6 +1309,7 @@ function FollowUpSection({ patients, rules, setRules }) {
         eyebrow="Richiami automatici"
         title="Follow-up WhatsApp"
         description="Il titolare sceglie le regole. Il sistema invia i messaggi WhatsApp agli intervalli impostati, senza conferma manuale dello staff."
+        right={<Button type="button" onClick={() => onRunAutomations?.(true)}>Esegui follow-up ora</Button>}
       />
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <Panel className="p-6">
@@ -1346,12 +1347,22 @@ function FollowUpSection({ patients, rules, setRules }) {
 
         <Panel className="p-6">
           <h2 className="text-xl font-bold">Coda follow-up</h2>
+          {automationResult ? (
+            <div className="mt-4 rounded-2xl border border-teal-200 bg-teal-50 p-4 text-sm text-teal-900">
+              Ultimo controllo: {automationResult.count || 0} messaggi generati, {automationResult.dryRun || 0} in dry-run, {automationResult.sent || 0} inviati.
+            </div>
+          ) : null}
           <div className="mt-5 space-y-3">
             {duePatients.length ? duePatients.map((patient) => (
               <div key={patient.id} className="flex items-center justify-between rounded-2xl border border-slate-200 p-4">
                 <div>
                   <div className="font-bold">{patient.name}</div>
                   <div className="text-sm text-slate-500">{patient.dueReason} - ultimo appuntamento {daysSince(patient.lastVisit)} giorni fa</div>
+                  <div className="mt-1 text-xs text-slate-400">
+                    {automationRuns.some((run) => run.patientId === patient.id && run.type === "followup")
+                      ? "Almeno un follow-up gia' generato"
+                      : "Pronto per il prossimo controllo automatico"}
+                  </div>
                 </div>
                 <Pill tone="teal">Invio automatico</Pill>
               </div>
@@ -1657,20 +1668,40 @@ function QuotesSection({ quotes }) {
   );
 }
 
-function AutomationsSection({ automations, setAutomations }) {
+function AutomationsSection({ automations, setAutomations, automationRuns, onRunAutomations, automationResult, backendStatus }) {
+  const latestRuns = Array.isArray(automationRuns) ? automationRuns.slice(0, 8) : [];
   return (
     <>
       <SectionHeader
         eyebrow="Motore operativo"
         title="Automazioni"
         description="Le automazioni sono pensate per funzionare in background: WhatsApp in ingresso, agenda, Fill the Gap, follow-up e preventivi."
+        right={
+          <Button type="button" onClick={() => onRunAutomations?.(true)} disabled={!backendStatus.configured}>
+            Esegui controllo ora
+          </Button>
+        }
       />
+      {automationResult ? (
+        <Panel className="mb-6 p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-xl font-bold">Ultimo controllo automazioni</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {automationResult.count || 0} messaggi generati - {automationResult.sent || 0} inviati live - {automationResult.dryRun || 0} dry-run - {automationResult.errors || 0} errori.
+              </p>
+            </div>
+            <Pill tone={automationResult.errors ? "rose" : "green"}>{automationResult.mode || "dry-run"}</Pill>
+          </div>
+        </Panel>
+      ) : null}
       <div className="grid gap-4 md:grid-cols-2">
         {automations.map((automation) => (
           <Panel key={automation.id} className="p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-bold">{automation.label}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{automation.detail}</p>
               </div>
               <button
                 onClick={() => setAutomations((current) => current.map((item) => (item.id === automation.id ? { ...item, active: !item.active } : item)))}
@@ -1682,6 +1713,26 @@ function AutomationsSection({ automations, setAutomations }) {
           </Panel>
         ))}
       </div>
+      <Panel className="mt-6 p-6">
+        <h2 className="text-xl font-bold">Storico automazioni</h2>
+        <div className="mt-5 space-y-3">
+          {latestRuns.length ? latestRuns.map((run) => (
+            <div key={run.id || run.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="font-bold">{cleanDisplayText(run.patientName)} - {cleanDisplayText(run.ruleName || run.type)}</div>
+                  <div className="mt-1 text-sm text-slate-500">{cleanDisplayText(run.text)}</div>
+                </div>
+                <Pill tone={run.error ? "rose" : run.dryRun ? "amber" : "green"}>{run.error ? "Errore" : run.dryRun ? "Dry-run" : "Inviato"}</Pill>
+              </div>
+            </div>
+          )) : (
+            <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-sm text-slate-500">
+              Nessuna automazione eseguita ancora. Usa "Esegui controllo ora" per testare i follow-up.
+            </div>
+          )}
+        </div>
+      </Panel>
       <Panel className="mt-6 p-6">
         <h2 className="text-xl font-bold">Controlli operativi</h2>
         <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1961,6 +2012,8 @@ function ProductApp() {
   const [log, setLog] = useStoredState("studioflow-log", []);
   const [outboundQueue, setOutboundQueue] = useStoredState("studioflow-outbound-queue", []);
   const [conversations, setConversations] = useStoredState("studioflow-conversations", {});
+  const [automationRuns, setAutomationRuns] = useStoredState("studioflow-automation-runs", []);
+  const [automationResult, setAutomationResult] = useState(null);
   const [backendStatus, setBackendStatus] = useState({ checked: false, configured: false, needsSeed: false, updatedAt: null });
   const [selectedDate, setSelectedDate] = useState(todayISO());
   const applyingRemoteRef = useRef(false);
@@ -1977,6 +2030,7 @@ function ProductApp() {
     log,
     outboundQueue,
     conversations,
+    automationRuns,
   });
 
   const applyProductState = (state) => {
@@ -1992,6 +2046,7 @@ function ProductApp() {
     if (Array.isArray(state.log)) setLog(state.log);
     if (Array.isArray(state.outboundQueue)) setOutboundQueue(state.outboundQueue);
     if (state.conversations && typeof state.conversations === "object") setConversations(state.conversations);
+    if (Array.isArray(state.automationRuns)) setAutomationRuns(state.automationRuns);
     window.setTimeout(() => {
       applyingRemoteRef.current = false;
     }, 0);
@@ -2059,7 +2114,7 @@ function ProductApp() {
       if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
     };
-  }, [patients, appointments, waitlist, quotes, rules, automations, gaps, log, outboundQueue, conversations, backendStatus.configured]);
+  }, [patients, appointments, waitlist, quotes, rules, automations, gaps, log, outboundQueue, conversations, automationRuns, backendStatus.configured]);
 
   const refreshProductState = async () => {
     if (!backendStatus.configured) return;
@@ -2072,6 +2127,24 @@ function ProductApp() {
       }
     } catch (error) {
       setBackendStatus((current) => ({ ...current, error: "Aggiornamento database non riuscito" }));
+    }
+  };
+
+  const runAutomationsNow = async (force = true) => {
+    try {
+      const response = await fetch("/api/run-automations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force }),
+      });
+      const payload = await response.json();
+      setAutomationResult(payload);
+      await refreshProductState();
+      return payload;
+    } catch (error) {
+      const payload = { ok: false, count: 0, sent: 0, dryRun: 0, errors: 1, error: "Automazioni non raggiungibili." };
+      setAutomationResult(payload);
+      return payload;
     }
   };
 
@@ -2186,11 +2259,29 @@ function ProductApp() {
       {activeSection === "fillgap" ? (
         <FillGapSection gaps={visibleGaps} patients={patients} appointments={appointments} waitlist={waitlist} onRunGap={runGap} onCloseGap={closeGap} />
       ) : null}
-      {activeSection === "followup" ? <FollowUpSection patients={patients} rules={rules} setRules={setRules} /> : null}
+      {activeSection === "followup" ? (
+        <FollowUpSection
+          patients={patients}
+          rules={rules}
+          setRules={setRules}
+          automationRuns={automationRuns}
+          onRunAutomations={runAutomationsNow}
+          automationResult={automationResult}
+        />
+      ) : null}
       {activeSection === "patients" ? <PatientsSection patients={patients} setPatients={setPatients} /> : null}
       {activeSection === "waitlist" ? <WaitlistSection waitlist={waitlist} setWaitlist={setWaitlist} patients={patients} /> : null}
       {activeSection === "quotes" ? <QuotesSection quotes={quotes} /> : null}
-      {activeSection === "automations" ? <AutomationsSection automations={automations} setAutomations={setAutomations} /> : null}
+      {activeSection === "automations" ? (
+        <AutomationsSection
+          automations={automations}
+          setAutomations={setAutomations}
+          automationRuns={automationRuns}
+          onRunAutomations={runAutomationsNow}
+          automationResult={automationResult}
+          backendStatus={backendStatus}
+        />
+      ) : null}
       {activeSection === "whatsapp" ? (
         <WhatsAppSection
           patients={patients}
