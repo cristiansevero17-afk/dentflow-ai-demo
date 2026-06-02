@@ -176,8 +176,8 @@ function analyzeLocally(message, patientName) {
   ]);
   const hasAvailability = includesFuzzyAny(normalized, ["posto", "disponibilita", "disponibile", "avete un posto", "avete posto", "c'e posto", "ce posto", "settimana prossima", "prenotare", "quando avete", "slot libero", "orari liberi"]);
   const hasQuote =
-    includesFuzzyAny(normalized, ["preventivo", "prezzo", "dottore", "impianto", "implantologia", "chiarimento", "proposta"]) ||
-    /\b(cost[ao]|quanto costa|quanto viene|spesa)\b/.test(normalized);
+    includesFuzzyAny(normalized, ["preventivo", "dottore", "impianto", "implantologia", "chiarimento", "proposta"]) ||
+    /\b(prezz[oi]|cost[ao]|quanto costa|quanto viene|spesa)\b/.test(normalized);
   const hasConfirmation = hasConfirmationIntent(normalized);
   const firstName = String(patientName || "Paziente").split(" ")[0] || "Paziente";
   const detected = [
